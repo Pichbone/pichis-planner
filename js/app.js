@@ -182,7 +182,8 @@
     "": { id: "home", title: null },
     "einkauf": { id: "shopping", title: "Einkaufsliste", module: "shopping" },
     "aufgaben": { id: "todos", title: "Aufgaben", module: "todos" },
-    "kalender": { id: "calendar", title: "Kalender", module: "calendar" }
+    "kalender": { id: "calendar", title: "Kalender", module: "calendar" },
+    "medien": { id: "media", title: "Neue Medien", module: "media" }
   };
   let activeView = null;
 

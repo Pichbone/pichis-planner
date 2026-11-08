@@ -177,11 +177,11 @@
           <div class="tile-name">Aufgaben per Mail</div>
           <div class="tile-status">Bald</div>
         </div>
-        <div class="tile">
+        <a class="tile tile-active tile-purple" href="#/medien">
           <div class="tile-icon">🎬</div>
-          <div class="tile-name">Neuerscheinungen</div>
-          <div class="tile-status">Bald</div>
-        </div>
+          <div class="tile-name">Neue Medien</div>
+          <div class="tile-status" id="tile-media-status">Öffnen</div>
+        </a>
       </div>
 
       <h2 class="section-title">Familie</h2>
@@ -226,6 +226,20 @@
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
+     </div>
+
+     <!-- ===== Neue Medien ===== -->
+     <div id="view-media" class="view" hidden>
+      <div class="media-toolbar">
+        <select id="media-genre" aria-label="Genre"></select>
+        <label class="switch switch-sm"><input type="checkbox" id="media-show-done"><span class="small">Erledigte zeigen</span></label>
+        <span class="spacer"></span>
+        <button class="icon-btn icon-btn-accent" id="btn-media-add" aria-label="Medium hinzufügen" title="Hinzufügen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="chips" id="media-types"></div>
+      <div id="media-items"></div>
      </div>
 
      <!-- ===== Kalender ===== -->
@@ -427,6 +441,55 @@
     <button type="button" class="link danger-link ev-delete" id="btn-delete-event" hidden>Termin löschen</button>
   </div>
 
+  <!-- Medium hinzufügen / bearbeiten -->
+  <div id="sheet-media" class="sheet" hidden role="dialog" aria-label="Medium">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="media-sheet-title">Medium hinzufügen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+
+    <div id="media-search-block">
+      <div class="chip-wrap" id="media-add-types"></div>
+      <form id="form-media-search" class="inline-form" autocomplete="off">
+        <input type="search" name="q" maxlength="500" aria-label="Suche">
+        <button type="submit" class="btn btn-small" id="btn-media-search">Suchen</button>
+      </form>
+      <div id="media-results"></div>
+    </div>
+
+    <form id="form-media" class="form media-form" autocomplete="off">
+      <div class="media-form-head">
+        <div id="media-form-cover" class="media-form-cover"></div>
+        <label class="grow">Titel
+          <input type="text" name="title" required maxlength="300">
+        </label>
+      </div>
+      <label>Von (Künstler, Autor, Regie …)
+        <input type="text" name="creator" maxlength="300">
+      </label>
+      <div class="form-row form-row-even">
+        <label>Erscheinungsdatum
+          <input type="date" name="release_date">
+        </label>
+        <label>Genre
+          <input type="text" name="genre" maxlength="80" list="media-genres-dl" placeholder="z. B. Krimi">
+        </label>
+      </div>
+      <datalist id="media-genres-dl"></datalist>
+      <label>Link
+        <input type="url" name="url" maxlength="2000" placeholder="https://…">
+      </label>
+      <label>Notiz
+        <input type="text" name="note" maxlength="1000" placeholder="z. B. Tipp von Anna, im Kino ansehen">
+      </label>
+      <input type="hidden" name="image_url">
+      <input type="hidden" name="description">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <button type="button" class="link danger-link" id="btn-media-delete" hidden>Aus der Liste entfernen</button>
+    </form>
+  </div>
+
   <!-- Kalender-Einstellungen -->
   <div id="sheet-calsettings" class="sheet" hidden role="dialog" aria-label="Kalender-Einstellungen">
     <div class="sheet-handle"></div>
@@ -548,5 +611,6 @@
   <script src="/js/shopping.js"></script>
   <script src="/js/todos.js"></script>
   <script src="/js/calendar.js"></script>
+  <script src="/js/media.js"></script>
 </body>
 </html>
