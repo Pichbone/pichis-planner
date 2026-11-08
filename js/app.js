@@ -181,7 +181,8 @@
   const VIEWS = {
     "": { id: "home", title: null },
     "einkauf": { id: "shopping", title: "Einkaufsliste", module: "shopping" },
-    "aufgaben": { id: "todos", title: "Aufgaben", module: "todos" }
+    "aufgaben": { id: "todos", title: "Aufgaben", module: "todos" },
+    "kalender": { id: "calendar", title: "Kalender", module: "calendar" }
   };
   let activeView = null;
 

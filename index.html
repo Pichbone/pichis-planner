@@ -162,11 +162,11 @@
           <div class="tile-name">Aufgaben</div>
           <div class="tile-status" id="tile-todo-status">Öffnen</div>
         </a>
-        <div class="tile">
+        <a class="tile tile-active tile-blue" href="#/kalender">
           <div class="tile-icon">📅</div>
           <div class="tile-name">Kalender</div>
-          <div class="tile-status">Bald</div>
-        </div>
+          <div class="tile-status">iCloud · Öffnen</div>
+        </a>
         <div class="tile">
           <div class="tile-icon">✉️</div>
           <div class="tile-name">Einladungen</div>
@@ -226,6 +226,37 @@
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
+     </div>
+
+     <!-- ===== Kalender ===== -->
+     <div id="view-calendar" class="view" hidden>
+      <div class="cal-toolbar">
+        <button class="icon-btn" id="cal-prev" aria-label="Vorheriger Monat">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <h2 id="cal-month-title" class="cal-month"></h2>
+        <button class="icon-btn" id="cal-next" aria-label="Nächster Monat">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <span class="spacer"></span>
+        <button class="btn btn-small" id="cal-today">Heute</button>
+        <button class="icon-btn" id="cal-settings" aria-label="Kalender-Einstellungen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--surface)"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><circle cx="7" cy="18" r="2" fill="var(--surface)"/></svg>
+        </button>
+      </div>
+      <div id="cal-notes"></div>
+      <div class="chips" id="cal-tags"></div>
+
+      <div class="cal-layout">
+        <div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <p class="muted small cal-loading" id="cal-loading" hidden>Termine werden aus iCloud geladen …</p>
+        </div>
+        <div class="cal-dayview">
+          <h3 id="cal-day-title" class="cal-day-title"></h3>
+          <div id="cal-day-list"></div>
+        </div>
+      </div>
      </div>
     </main>
   </section>
@@ -302,6 +333,85 @@
     </form>
   </div>
 
+  <!-- Termin: Details, Tags, Personen -->
+  <div id="sheet-event" class="sheet" hidden role="dialog" aria-label="Termin">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="ev-title">Termin</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div class="ev-info">
+      <p id="ev-when"></p>
+      <p id="ev-where" class="muted"></p>
+      <p id="ev-calendar" class="ev-calendar small"></p>
+      <p id="ev-notes" class="ev-notes small"></p>
+    </div>
+
+    <h3 class="sheet-sub">Tags</h3>
+    <div class="chip-wrap" id="ev-tags"></div>
+    <form id="form-new-tag" class="inline-form" autocomplete="off">
+      <input type="text" name="name" maxlength="40" placeholder="Neuer Tag, z. B. DJ" aria-label="Neuer Tag">
+      <button type="submit" class="btn btn-small">Anlegen</button>
+    </form>
+
+    <h3 class="sheet-sub">Wer ist dabei?</h3>
+    <div class="chip-wrap" id="ev-members"></div>
+    <p class="muted small" id="ev-series-hint" hidden>Gilt für alle Termine dieser Serie.</p>
+    <p class="muted small">Ausgewählte Familienmitglieder sehen den Termin in Pichis Planner, auch wenn der Kalender sonst nicht freigegeben ist.</p>
+
+    <button type="button" class="btn btn-primary btn-block" id="btn-save-event">Speichern</button>
+  </div>
+
+  <!-- Kalender-Einstellungen -->
+  <div id="sheet-calsettings" class="sheet" hidden role="dialog" aria-label="Kalender-Einstellungen">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Kalender</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+
+    <h3 class="sheet-sub">Mein iCloud</h3>
+    <div id="cal-account"></div>
+
+    <div id="cal-list-mine-block">
+      <h3 class="sheet-sub">Meine Kalender</h3>
+      <p class="muted small">„Familie“ aus = nur du siehst die Termine.</p>
+      <ul class="cal-list" id="cal-list-mine"></ul>
+    </div>
+
+    <h3 class="sheet-sub">Kalender der Familie</h3>
+    <ul class="cal-list" id="cal-list-others"></ul>
+
+    <h3 class="sheet-sub">Tags</h3>
+    <ul class="cal-list" id="cal-tag-list"></ul>
+
+    <button type="button" class="link danger-link" id="btn-cal-disconnect">iCloud-Verbindung trennen</button>
+  </div>
+
+  <!-- iCloud verbinden -->
+  <div id="sheet-connect" class="sheet" hidden role="dialog" aria-label="iCloud verbinden">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>iCloud verbinden</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <ol class="steps small">
+      <li>Auf <a href="https://account.apple.com" target="_blank" rel="noopener">account.apple.com</a> anmelden.</li>
+      <li>„Anmeldung und Sicherheit“ → „App-spezifische Passwörter“ öffnen.</li>
+      <li>Ein neues Passwort mit dem Namen <b>Pichis Planner</b> erstellen und kopieren.</li>
+    </ol>
+    <form id="form-connect" class="form" autocomplete="off">
+      <label>Apple-ID (E-Mail)
+        <input type="email" name="username" required autocomplete="username">
+      </label>
+      <label>App-spezifisches Passwort
+        <input type="password" name="password" required placeholder="xxxx-xxxx-xxxx-xxxx" autocomplete="new-password">
+      </label>
+      <p class="muted small">Nicht dein normales Apple-Passwort. Es wird verschlüsselt gespeichert und lässt sich bei Apple jederzeit widerrufen.</p>
+      <button type="submit" class="btn btn-primary">Verbinden</button>
+    </form>
+  </div>
+
   <div id="sheet-list" class="sheet" hidden role="dialog" aria-label="Liste bearbeiten">
     <div class="sheet-handle"></div>
     <div class="panel-head">
@@ -356,5 +466,6 @@
   <script src="/js/app.js"></script>
   <script src="/js/shopping.js"></script>
   <script src="/js/todos.js"></script>
+  <script src="/js/calendar.js"></script>
 </body>
 </html>
