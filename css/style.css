@@ -106,7 +106,7 @@ input[type="text"], input[type="email"], input[type="password"] {
   color: var(--ink);
   width: 100%;
 }
-input:focus { outline: 2px solid var(--green); outline-offset: 1px; border-color: transparent; }
+input:focus, input[type="time"]:focus { outline: 2px solid var(--green); outline-offset: 1px; border-color: transparent; }
 
 .code-input { text-transform: uppercase; letter-spacing: .2em; font-weight: 600; text-align: center; }
 
@@ -485,7 +485,7 @@ textarea {
   resize: vertical;
 }
 textarea:focus, select:focus { outline: 2px solid var(--green); outline-offset: 1px; border-color: transparent; }
-input[type="date"] {
+input[type="date"], input[type="time"] {
   font: inherit;
   font-size: 16px;
   padding: 11px 12px;
@@ -547,6 +547,13 @@ input[type="date"] {
 .cal-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .cal-toolbar .icon-btn { width: 38px; height: 38px; }
 .cal-month { margin: 0; font-size: 1.25rem; min-width: 0; white-space: nowrap; }
+.m-short { display: none; }
+@media (max-width: 430px) {
+  .cal-toolbar { gap: 6px; }
+  .cal-month { font-size: 1.1rem; }
+  .m-long { display: none; }
+  .m-short { display: inline; }
+}
 .spacer { flex: 1; }
 
 .banner-action, .banner-warn { margin-bottom: 12px; align-items: center; }
@@ -685,6 +692,11 @@ input[type="date"] {
 }
 .switch-sm input:checked { background: var(--green); border-color: var(--green); }
 .switch-sm input:checked::after { transform: translateX(14px); }
+
+.icon-btn-accent { background: var(--orange); border-color: var(--orange); color: #fff; }
+.ev-title { font-size: 1.15rem; margin-bottom: 8px; }
+.ev-delete { display: block; margin: 12px auto 0; }
+#form-event label[hidden] { display: none !important; }
 
 .steps { padding-left: 20px; margin: 0 0 16px; line-height: 1.6; }
 .steps a { color: var(--green); }

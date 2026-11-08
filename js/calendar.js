@@ -214,7 +214,8 @@
     const byDay = eventsByDay();
 
     // Kopfzeile
-    $("#cal-month-title").textContent = `${MONTHS[cal.month.getMonth()]} ${cal.month.getFullYear()}`;
+    const mName = MONTHS[cal.month.getMonth()];
+    $("#cal-month-title").innerHTML = `<span class="m-long">${mName}</span><span class="m-short">${mName.length > 4 ? mName.slice(0, 3) + "." : mName}</span> ${cal.month.getFullYear()}`;
     $("#cal-loading").hidden = !cal.loading;
 
     // Hinweise
@@ -286,15 +287,21 @@
       : `<p class="muted cal-empty">${cal.loading ? "Termine werden geladen …" : "Keine Termine."}</p>`;
   }
 
-  // ---------- Detail-Fenster: Tags und Personen ----------
-  function openEvent(id) {
-    const ev = cal.events.find(x => x.id === id);
-    if (!ev) return;
-    cal.editing = ev;
-    const meta = metaOf(ev);
-    cal.draftTags = new Set(meta ? meta.tag_ids : []);
-    cal.draftMembers = new Set(meta ? meta.member_ids : []);
+  // ---------- Termin-Fenster: ansehen, anlegen, bearbeiten ----------
+  const ALARM_OPTIONS = ["none", "0", "10", "30", "60", "120", "1440", "2880"];
 
+  function hhmm(d) { return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+
+  function writableOwnCalendars() {
+    const me = state.session.user.id;
+    return cal.calendars.filter(c => c.user_id === me && !c.read_only);
+  }
+
+  function canEdit(ev) {
+    return writableOwnCalendars().some(c => c.id === ev.calendar_id);
+  }
+
+  function fillReadonly(ev) {
     $("#ev-title").textContent = ev.title;
     let when;
     if (ev.all_day) {
@@ -308,18 +315,156 @@
         : `${longDate(isoDate(s))}, ${timeText(s)} – ${longDate(isoDate(e))}, ${timeText(e)}`;
     }
     $("#ev-when").textContent = when + (ev.recurring ? " · wiederholt sich" : "");
-    $("#ev-where").textContent = ev.location || "";
+    $("#ev-where").textContent = ev.location ? "📍 " + ev.location : "";
     $("#ev-where").hidden = !ev.location;
     $("#ev-notes").textContent = ev.notes || "";
     $("#ev-notes").hidden = !ev.notes;
     const owner = ev.owner_id === state.session.user.id ? "" : " von " + (memberName(ev.owner_id) || "?");
     $("#ev-calendar").innerHTML = `<i style="background:${escapeHtml(ev.calendar_color)}"></i>${escapeHtml(ev.calendar_name)}${escapeHtml(owner)}`;
+  }
+
+  function setAllDayUi(allDay) {
+    document.querySelectorAll("#form-event [data-time]").forEach(el => { el.hidden = allDay; });
+  }
+
+  function fillCalendarSelect(selected) {
+    const f = $("#form-event");
+    const list = writableOwnCalendars();
+    f.calendar_id.innerHTML = list.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+    if (selected && list.some(c => c.id === selected)) f.calendar_id.value = selected;
+  }
+
+  function setAlarmSelect(value) {
+    const sel = $("#form-event").alarm;
+    const keep = sel.querySelector('option[value="keep"]');
+    if (ALARM_OPTIONS.includes(value)) {
+      keep.hidden = true;
+      sel.value = value;
+    } else {
+      keep.hidden = false;
+      sel.value = "keep";
+    }
+  }
+
+  function openEvent(id) {
+    const ev = cal.events.find(x => x.id === id);
+    if (!ev) return;
+    cal.editing = { mode: canEdit(ev) ? "edit" : "view", ev };
+    const meta = metaOf(ev);
+    cal.draftTags = new Set(meta ? meta.tag_ids : []);
+    cal.draftMembers = new Set(meta ? meta.member_ids : []);
+
+    const editable = cal.editing.mode === "edit";
+    $("#ev-head").textContent = editable ? "Termin bearbeiten" : "Termin";
+    $("#ev-readonly").hidden = editable;
+    $("#form-event").hidden = !editable;
+    $("#btn-delete-event").hidden = !editable;
+    $("#btn-delete-event").textContent = ev.recurring ? "Ganze Serie löschen" : "Termin löschen";
     $("#ev-series-hint").hidden = !ev.recurring;
+
+    if (editable) {
+      const f = $("#form-event");
+      f.reset();
+      f.title.value = ev.title;
+      f.location.value = ev.location || "";
+      f.notes.value = ev.notes || "";
+      f.all_day.checked = ev.all_day;
+      if (ev.all_day) {
+        f.start_date.value = ev.start;
+        f.end_date.value = isoDate(addDays(parseIso(ev.end), -1));
+        f.start_time.value = "10:00";
+        f.end_time.value = "11:00";
+      } else {
+        const s = new Date(ev.start), e = new Date(ev.end);
+        f.start_date.value = isoDate(s);
+        f.end_date.value = isoDate(e);
+        f.start_time.value = hhmm(s);
+        f.end_time.value = hhmm(e);
+      }
+      setAllDayUi(ev.all_day);
+      fillCalendarSelect(ev.calendar_id);
+      setAlarmSelect(ev.alarm === null || ev.alarm === undefined ? "none" : String(ev.alarm));
+
+      // Bei Serien: Zeiten und Wiederholung nur im Apple-Kalender ändern
+      const series = !!ev.recurring;
+      ["all_day", "start_date", "end_date", "start_time", "end_time"].forEach(n => { f[n].disabled = series; });
+      $("#ev-series-times").hidden = !series;
+      $("#ev-cal-row").hidden = true;      // Kalender wechseln geht nicht
+      $("#ev-repeat-row").hidden = true;
+    } else {
+      fillReadonly(ev);
+    }
 
     renderEventPickers();
     $("#form-new-tag").reset();
     openSheet("sheet-event");
   }
+
+  function openNewEvent() {
+    const own = writableOwnCalendars();
+    if (!own.length) {
+      toast("Verbinde zuerst deinen iCloud-Kalender, um Termine anzulegen.");
+      openConnect();
+      return;
+    }
+    cal.editing = { mode: "new", ev: null };
+    cal.draftTags = new Set(cal.tagFilter ? [cal.tagFilter] : []);
+    cal.draftMembers = new Set();
+
+    const f = $("#form-event");
+    f.reset();
+    ["all_day", "start_date", "end_date", "start_time", "end_time"].forEach(n => { f[n].disabled = false; });
+
+    // Startzeit: heute nächste volle Stunde, sonst 10 Uhr
+    let start = "10:00", end = "11:00", day = cal.selected;
+    if (cal.selected === isoDate(new Date())) {
+      const h = new Date().getHours() + 1;
+      if (h <= 22) { start = `${String(h).padStart(2, "0")}:00`; end = `${String(h + 1).padStart(2, "0")}:00`; }
+      else { day = isoDate(addDays(new Date(), 1)); }
+    }
+    f.start_date.value = day;
+    f.end_date.value = day;
+    f.start_time.value = start;
+    f.end_time.value = end;
+    setAllDayUi(false);
+    fillCalendarSelect(storageGet("pp_cal_last"));
+    setAlarmSelect(storageGet("pp_cal_alarm") || "30");
+
+    $("#ev-head").textContent = "Neuer Termin";
+    $("#ev-readonly").hidden = true;
+    $("#form-event").hidden = false;
+    $("#ev-series-times").hidden = true;
+    $("#ev-cal-row").hidden = false;
+    $("#ev-repeat-row").hidden = false;
+    $("#btn-delete-event").hidden = true;
+    $("#ev-series-hint").hidden = true;
+
+    renderEventPickers();
+    $("#form-new-tag").reset();
+    openSheet("sheet-event");
+    setTimeout(() => f.title.focus(), 50);
+  }
+
+  // Formular-Komfort: Ende folgt dem Beginn
+  (() => {
+    const f = $("#form-event");
+    let lastStart = null;
+    f.all_day.addEventListener("change", () => setAllDayUi(f.all_day.checked));
+    f.start_date.addEventListener("change", () => {
+      if (!f.end_date.value || f.end_date.value < f.start_date.value) f.end_date.value = f.start_date.value;
+    });
+    f.start_time.addEventListener("focus", () => { lastStart = f.start_time.value; });
+    f.start_time.addEventListener("change", () => {
+      const toMin = v => { const [h, m] = v.split(":").map(Number); return h * 60 + m; };
+      if (!f.start_time.value) return;
+      const dur = lastStart && f.end_time.value ? Math.max(15, toMin(f.end_time.value) - toMin(lastStart)) : 60;
+      const endMin = Math.min(toMin(f.start_time.value) + dur, 23 * 60 + 55);
+      if (f.start_date.value === f.end_date.value) {
+        f.end_time.value = `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+      }
+      lastStart = f.start_time.value;
+    });
+  })();
 
   function renderEventPickers() {
     $("#ev-tags").innerHTML = cal.tags.length
@@ -372,37 +517,103 @@
     });
   });
 
+  async function saveMeta(calendarId, uid) {
+    const key = calendarId + "|" + uid;
+    const existing = cal.metas.get(key);
+    const payload = {
+      tag_ids: [...cal.draftTags].filter(id => cal.tags.some(t => t.id === id)),
+      member_ids: [...cal.draftMembers]
+    };
+    if (!existing && !payload.tag_ids.length && !payload.member_ids.length) return;
+    const res = existing
+      ? await sb.from("event_meta").update(payload).eq("id", existing.id)
+          .select("id, calendar_id, uid, tag_ids, member_ids").single()
+      : await sb.from("event_meta").insert({ household_id: state.household.id, calendar_id: calendarId, uid, ...payload })
+          .select("id, calendar_id, uid, tag_ids, member_ids").single();
+    if (res.error) throw res.error;
+    cal.metas.set(key, res.data);
+  }
+
+  function formPayload() {
+    const f = $("#form-event");
+    return {
+      title: f.title.value.trim(),
+      location: f.location.value.trim(),
+      notes: f.notes.value.trim(),
+      all_day: f.all_day.checked,
+      start_date: f.start_date.value,
+      end_date: f.end_date.value || f.start_date.value,
+      start_time: f.start_time.value,
+      end_time: f.end_time.value,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Berlin",
+      repeat: f.repeat.value,
+      alarm: f.alarm.value
+    };
+  }
+
   $("#btn-save-event").addEventListener("click", async () => {
-    const ev = cal.editing;
-    if (!ev) return;
+    const ed = cal.editing;
+    if (!ed) return;
+    const f = $("#form-event");
+    if (ed.mode !== "view" && !f.reportValidity()) return;
+
     const btn = $("#btn-save-event");
     btn.disabled = true;
+    btn.textContent = "Speichert …";
     try {
-      const existing = metaOf(ev);
-      const payload = {
-        tag_ids: [...cal.draftTags].filter(id => cal.tags.some(t => t.id === id)),
-        member_ids: [...cal.draftMembers]
-      };
-      let res;
-      if (existing) {
-        res = await sb.from("event_meta").update(payload).eq("id", existing.id)
-          .select("id, calendar_id, uid, tag_ids, member_ids").single();
-      } else {
-        res = await sb.from("event_meta").insert({
-          household_id: state.household.id,
-          calendar_id: ev.calendar_id,
-          uid: ev.uid,
-          ...payload
-        }).select("id, calendar_id, uid, tag_ids, member_ids").single();
+      if (ed.mode === "view") {
+        await saveMeta(ed.ev.calendar_id, ed.ev.uid);
+        closeSheets();
+        render();
+        return;
       }
-      if (res.error) throw res.error;
-      cal.metas.set(ev.calendar_id + "|" + ev.uid, res.data);
+
+      const p = formPayload();
+      if (ed.mode === "new") {
+        p.calendar_id = f.calendar_id.value;
+        const r = await callIcloud("create", p);
+        storageSet("pp_cal_last", p.calendar_id);
+        storageSet("pp_cal_alarm", p.alarm);
+        await saveMeta(r.calendar_id, r.uid);
+        toast("Termin angelegt – er erscheint auch im Apple-Kalender.");
+      } else {
+        const ev = ed.ev;
+        const r = await callIcloud("update", { ...p, calendar_id: ev.calendar_id, href: ev.href, etag: ev.etag });
+        await saveMeta(ev.calendar_id, ev.uid);
+        toast(r.series ? "Serie aktualisiert." : "Termin gespeichert.");
+      }
+
+      // Zum Datum des Termins springen und neu laden
+      cal.selected = p.start_date;
+      cal.month = firstOfMonth(parseIso(p.start_date));
+      cal.cache.clear();
       closeSheets();
-      render();
+      await loadEvents(true);
     } catch (err) {
-      toast(PP.translateError(err), true);
+      toast(err.message || PP.translateError(err), true);
     } finally {
       btn.disabled = false;
+      btn.textContent = "Speichern";
+    }
+  });
+
+  $("#btn-delete-event").addEventListener("click", async () => {
+    const ed = cal.editing;
+    if (!ed || ed.mode !== "edit") return;
+    const ev = ed.ev;
+    const question = ev.recurring
+      ? `„${ev.title}“ ist ein Serientermin. Die ganze Serie löschen – auch im Apple-Kalender?`
+      : `„${ev.title}“ löschen – auch im Apple-Kalender?`;
+    if (!confirm(question)) return;
+    try {
+      await callIcloud("delete", { calendar_id: ev.calendar_id, href: ev.href, etag: ev.etag, uid: ev.uid });
+      cal.metas.delete(ev.calendar_id + "|" + ev.uid);
+      cal.cache.clear();
+      closeSheets();
+      toast("Termin gelöscht.");
+      await loadEvents(true);
+    } catch (err) {
+      toast(err.message, true);
     }
   });
 
@@ -580,6 +791,7 @@
       return;
     }
     if (t.id === "cal-settings") { openSettings(); return; }
+    if (t.id === "cal-add") { openNewEvent(); return; }
   });
 
   $("#sheet-connect").addEventListener("click", e => {

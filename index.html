@@ -240,6 +240,9 @@
         </button>
         <span class="spacer"></span>
         <button class="btn btn-small" id="cal-today">Heute</button>
+        <button class="icon-btn icon-btn-accent" id="cal-add" aria-label="Neuer Termin">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
         <button class="icon-btn" id="cal-settings" aria-label="Kalender-Einstellungen">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--surface)"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><circle cx="7" cy="18" r="2" fill="var(--surface)"/></svg>
         </button>
@@ -333,19 +336,80 @@
     </form>
   </div>
 
-  <!-- Termin: Details, Tags, Personen -->
+  <!-- Termin: anlegen, bearbeiten, Tags, Personen -->
   <div id="sheet-event" class="sheet" hidden role="dialog" aria-label="Termin">
     <div class="sheet-handle"></div>
     <div class="panel-head">
-      <h2 id="ev-title">Termin</h2>
+      <h2 id="ev-head">Termin</h2>
       <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
     </div>
-    <div class="ev-info">
+
+    <!-- Nur ansehen (Termine anderer / schreibgeschützt) -->
+    <div class="ev-info" id="ev-readonly">
+      <h3 id="ev-title" class="ev-title"></h3>
       <p id="ev-when"></p>
       <p id="ev-where" class="muted"></p>
       <p id="ev-calendar" class="ev-calendar small"></p>
       <p id="ev-notes" class="ev-notes small"></p>
     </div>
+
+    <!-- Bearbeiten (eigene Kalender) -->
+    <form id="form-event" class="form" autocomplete="off" hidden>
+      <label>Titel
+        <input type="text" name="title" required maxlength="200" placeholder="z. B. DJ-Gig Hochzeit">
+      </label>
+      <label class="switch"><input type="checkbox" name="all_day"><span>Ganztägig</span></label>
+      <div class="form-row form-row-even">
+        <label>Beginn
+          <input type="date" name="start_date" required>
+        </label>
+        <label data-time>Uhrzeit
+          <input type="time" name="start_time" step="300">
+        </label>
+      </div>
+      <div class="form-row form-row-even">
+        <label>Ende
+          <input type="date" name="end_date" required>
+        </label>
+        <label data-time>Uhrzeit
+          <input type="time" name="end_time" step="300">
+        </label>
+      </div>
+      <p class="muted small" id="ev-series-times" hidden>🔁 Serientermin: Datum und Uhrzeit bitte im Apple-Kalender ändern. Titel, Ort und Notiz gelten hier für die ganze Serie.</p>
+      <div class="form-row form-row-even">
+        <label id="ev-cal-row">Kalender
+          <select name="calendar_id"></select>
+        </label>
+        <label id="ev-repeat-row">Wiederholen
+          <select name="repeat">
+            <option value="none">Nie</option>
+            <option value="daily">Täglich</option>
+            <option value="weekly">Wöchentlich</option>
+            <option value="monthly">Monatlich</option>
+            <option value="yearly">Jährlich</option>
+          </select>
+        </label>
+      </div>
+      <label>Erinnerung aufs iPhone
+        <select name="alarm">
+          <option value="none">Keine</option>
+          <option value="0">Zum Beginn</option>
+          <option value="10">10 Minuten vorher</option>
+          <option value="30">30 Minuten vorher</option>
+          <option value="60">1 Stunde vorher</option>
+          <option value="120">2 Stunden vorher</option>
+          <option value="1440">1 Tag vorher</option>
+          <option value="2880">2 Tage vorher</option>
+          <option value="keep" hidden>Wie im Apple-Kalender</option>
+        </select>
+      </label>
+      <label>Ort
+        <input type="text" name="location" maxlength="300" placeholder="optional">
+      </label>
+      <label>Notiz
+        <textarea name="notes" rows="2" maxlength="5000" placeholder="optional"></textarea>
+      </label>
+    </form>
 
     <h3 class="sheet-sub">Tags</h3>
     <div class="chip-wrap" id="ev-tags"></div>
@@ -356,10 +420,11 @@
 
     <h3 class="sheet-sub">Wer ist dabei?</h3>
     <div class="chip-wrap" id="ev-members"></div>
-    <p class="muted small" id="ev-series-hint" hidden>Gilt für alle Termine dieser Serie.</p>
+    <p class="muted small" id="ev-series-hint" hidden>Tags und Personen gelten für alle Termine dieser Serie.</p>
     <p class="muted small">Ausgewählte Familienmitglieder sehen den Termin in Pichis Planner, auch wenn der Kalender sonst nicht freigegeben ist.</p>
 
     <button type="button" class="btn btn-primary btn-block" id="btn-save-event">Speichern</button>
+    <button type="button" class="link danger-link ev-delete" id="btn-delete-event" hidden>Termin löschen</button>
   </div>
 
   <!-- Kalender-Einstellungen -->
