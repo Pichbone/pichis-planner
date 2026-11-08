@@ -19,6 +19,7 @@
     channel: null,
     showDone: false,
     editingId: null,
+    files: new Map(),
     active: false
   };
 
@@ -51,7 +52,7 @@
 
   function parseTodo(raw, members) {
     let text = " " + raw.trim().replace(/\s+/g, " ") + " ";
-    const out = { title: "", due_date: null, priority: 0, repeat: "none", is_private: false, assigned_to: null };
+    const out = { title: "", due_date: null, due_time: null, duration_minutes: null, priority: 0, repeat: "none", is_private: false, assigned_to: null };
     const today = startOfToday();
 
     function take(re) {
@@ -104,6 +105,22 @@
         if (d.getMonth() === mon - 1) out.due_date = isoDate(d);
       }
     }
+    // Dauer: "für 2 Std", "1,5 h", "30 min", "90 Minuten"
+    if ((m = take(new RegExp(B + "(?:für\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(std\\.?|stunden?|h|min\\.?|minuten?)" + E, "i")))) {
+      const n = parseFloat(m[1].replace(",", "."));
+      const mins = /^m/i.test(m[2]) ? Math.round(n) : Math.round(n * 60);
+      if (mins > 0 && mins <= 10080) out.duration_minutes = mins;
+    }
+
+    // Uhrzeit: "um 15 Uhr", "15:30", "um 9.15", "18 Uhr"
+    if ((m = take(new RegExp(B + "(?:um\\s+)?(\\d{1,2})[:.](\\d{2})(?:\\s*uhr)?" + E, "i"))) ||
+        (m = take(new RegExp(B + "(?:um\\s+)?(\\d{1,2})\\s*uhr" + E, "i"))) ||
+        (m = take(new RegExp(B + "um\\s+(\\d{1,2})" + E, "i")))) {
+      const h = +m[1], min = m[2] ? +m[2] : 0;
+      if (h < 24 && min < 60) out.due_time = `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+    }
+    if (out.due_time && !out.due_date) out.due_date = isoDate(today);
+
     if (out.repeat !== "none" && !out.due_date) out.due_date = isoDate(today);
 
     const title = text.replace(/\s+/g, " ").trim().replace(/^[,.\-–]+|[,.\-–]+$/g, "").trim();
@@ -127,7 +144,23 @@
       .order("created_at", { ascending: true });
     if (error) throw error;
     td.items = data;
+    await loadFiles();
   }
+
+  async function loadFiles() {
+    const { data, error } = await sb.from("todo_attachments")
+      .select("id, todo_id, path, name, size, mime, created_at")
+      .eq("household_id", state.household.id)
+      .order("created_at", { ascending: true });
+    if (error) { console.warn(error); return; }
+    td.files = new Map();
+    for (const f of data) {
+      if (!td.files.has(f.todo_id)) td.files.set(f.todo_id, []);
+      td.files.get(f.todo_id).push(f);
+    }
+  }
+
+  function filesOf(todoId) { return (td.files && td.files.get(todoId)) || []; }
 
   function upsertLocal(row) {
     const i = td.items.findIndex(x => x.id === row.id);
@@ -143,6 +176,9 @@
         { event: "*", schema: "public", table: "todos", filter: `household_id=eq.${hid}` }, onChange)
       .on("postgres_changes",
         { event: "DELETE", schema: "public", table: "todos" }, onChange)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "todo_attachments", filter: `household_id=eq.${hid}` },
+        () => loadFiles().then(() => { render(); if (td.editingId) renderFiles(); }))
       .subscribe();
   }
   function unsubscribe() {
@@ -211,6 +247,7 @@
     if (!done.length) return;
     if (!confirm(`${done.length} erledigte Aufgaben endgültig entfernen?`)) return;
     const ids = done.map(x => x.id);
+    await removeStoredFiles(ids.flatMap(id => filesOf(id).map(f => f.path)));
     const { error } = await sb.from("todos").delete().in("id", ids);
     if (error) { toast(translateError(error), true); return; }
     const set = new Set(ids);
@@ -229,6 +266,11 @@
   function sortOpen(a, b) {
     if (a.priority !== b.priority) return b.priority - a.priority;
     if (a.due_date && b.due_date && a.due_date !== b.due_date) return a.due_date < b.due_date ? -1 : 1;
+    if (a.due_time !== b.due_time) {
+      if (!a.due_time) return 1;
+      if (!b.due_time) return -1;
+      return a.due_time < b.due_time ? -1 : 1;
+    }
     return String(a.created_at).localeCompare(String(b.created_at));
   }
 
@@ -254,8 +296,12 @@
     const meta = [];
     if (item.due_date) {
       const overdue = !item.is_done && dayDiff(item.due_date) < 0;
-      meta.push(`<span class="${overdue ? "due-overdue" : ""}">${escapeHtml(dueLabel(item.due_date))}</span>`);
+      meta.push(`<span class="${overdue ? "due-overdue" : ""}">${escapeHtml(dueLabel(item.due_date))}${item.due_time ? ", " + timeRange(item) : ""}</span>`);
+    } else if (item.duration_minutes) {
+      meta.push("⏱ " + durationText(item.duration_minutes));
     }
+    const nFiles = filesOf(item.id).length;
+    if (nFiles) meta.push(`📎 ${nFiles}`);
     if (item.repeat !== "none") meta.push("🔁 " + REPEAT_LABEL[item.repeat]);
     if (item.is_private) meta.push("🔒 privat");
     if (item.notes) meta.push(escapeHtml(item.notes.split("\n")[0]).slice(0, 80));
@@ -328,6 +374,8 @@
     f.title.value = item.title;
     f.notes.value = item.notes;
     f.due_date.value = item.due_date || "";
+    f.due_time.value = item.due_time ? String(item.due_time).slice(0, 5) : "";
+    setDurationSelect(item.duration_minutes);
     f.assigned_to.innerHTML = `<option value="">Niemand</option>` + state.members
       .map(m => `<option value="${m.id}">${escapeHtml(m.name)}${m.id === me ? " (du)" : ""}</option>`).join("");
     f.assigned_to.value = item.assigned_to || "";
@@ -339,6 +387,7 @@
     $("#todo-created").textContent = item.created_by && item.created_by !== me
       ? "Angelegt von " + (memberName(item.created_by) || "jemandem")
       : "";
+    renderFiles();
     openSheet("sheet-todo");
   }
 
@@ -350,12 +399,15 @@
         title: f.title.value.trim(),
         notes: f.notes.value.trim(),
         due_date: f.due_date.value || null,
+        due_time: f.due_time.value || null,
+        duration_minutes: f.duration_minutes.value ? +f.duration_minutes.value : null,
         assigned_to: f.assigned_to.value || null,
         repeat: f.repeat.value,
         priority: f.priority.checked ? 1 : 0
       };
       if (!f.is_private.disabled) payload.is_private = f.is_private.checked;
       if (payload.repeat !== "none" && !payload.due_date) payload.due_date = isoDate(startOfToday());
+      if (payload.due_time && !payload.due_date) payload.due_date = isoDate(startOfToday());
 
       const { data, error } = await sb.from("todos").update(payload).eq("id", td.editingId).select().single();
       if (error) throw error;
@@ -369,11 +421,152 @@
     const id = td.editingId;
     const item = td.items.find(x => x.id === id);
     if (item && item.repeat !== "none" && !confirm("Diese Aufgabe wiederholt sich. Wirklich löschen? Es werden keine weiteren Termine angelegt.")) return;
+    await removeStoredFiles(filesOf(id).map(f => f.path));
     const { error } = await sb.from("todos").delete().eq("id", id);
     if (error) { toast(translateError(error), true); return; }
     td.items = td.items.filter(x => x.id !== id);
+    td.files.delete(id);
     closeSheets();
     render();
+  });
+
+  // ---------- Uhrzeit und Dauer ----------
+  function durationText(min) {
+    if (min < 60) return `${min} Min.`;
+    const h = min / 60;
+    if (min % 60 === 0) return `${h} Std.`;
+    return `${String(Math.round(h * 10) / 10).replace(".", ",")} Std.`;
+  }
+
+  function timeRange(item) {
+    const start = String(item.due_time).slice(0, 5);
+    if (!item.duration_minutes) return start;
+    const [h, m] = start.split(":").map(Number);
+    const end = h * 60 + m + item.duration_minutes;
+    if (end >= 24 * 60) return `${start} · ${durationText(item.duration_minutes)}`;
+    return `${start}–${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`;
+  }
+
+  function setDurationSelect(value) {
+    const sel = $("#form-todo").duration_minutes;
+    sel.querySelectorAll("option[data-custom]").forEach(o => o.remove());
+    const v = value ? String(value) : "";
+    if (v && ![...sel.options].some(o => o.value === v)) {
+      const o = document.createElement("option");
+      o.value = v; o.textContent = durationText(+v); o.dataset.custom = "1";
+      sel.appendChild(o);
+    }
+    sel.value = v;
+  }
+
+  // ---------- Anlagen ----------
+  const FILE_ICONS = [
+    [/^image\//, "🖼️"], [/pdf/, "📄"], [/word|document|text/, "📝"],
+    [/sheet|excel|csv/, "📊"], [/audio/, "🎵"], [/video/, "🎬"], [/zip|compressed/, "🗜️"]
+  ];
+  function fileIcon(mime) {
+    for (const [re, icon] of FILE_ICONS) if (re.test(mime || "")) return icon;
+    return "📎";
+  }
+  function sizeText(b) {
+    if (b < 1024) return b + " B";
+    if (b < 1024 * 1024) return Math.round(b / 1024) + " KB";
+    return (Math.round(b / 1024 / 102.4) / 10).toString().replace(".", ",") + " MB";
+  }
+  function safeName(name) {
+    return (name || "datei").normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-80) || "datei";
+  }
+
+  function renderFiles() {
+    const files = filesOf(td.editingId);
+    $("#todo-files").innerHTML = files.length
+      ? files.map(f => `<li class="file-row">
+          <button type="button" class="file-open" data-open-file="${f.id}">
+            <span class="file-icon">${fileIcon(f.mime)}</span>
+            <span class="file-text"><span class="file-name">${escapeHtml(f.name)}</span><span class="file-size">${sizeText(f.size)}</span></span>
+          </button>
+          <button type="button" class="icon-btn small" data-del-file="${f.id}" aria-label="Anlage löschen">✕</button>
+        </li>`).join("")
+      : `<li class="muted small">Noch keine Anlagen.</li>`;
+  }
+
+  async function uploadFiles(fileList) {
+    const todoId = td.editingId;
+    const hid = state.household.id;
+    const btn = $("#btn-add-file");
+    btn.disabled = true;
+    let ok = 0;
+    try {
+      for (const file of fileList) {
+        if (file.size > 25 * 1024 * 1024) { toast(`„${file.name}“ ist größer als 25 MB.`, true); continue; }
+        btn.textContent = `Lädt hoch … (${ok + 1}/${fileList.length})`;
+        const path = `${hid}/${todoId}/${crypto.randomUUID()}-${safeName(file.name)}`;
+        const up = await sb.storage.from("todo-files").upload(path, file, {
+          contentType: file.type || "application/octet-stream",
+          upsert: false
+        });
+        if (up.error) throw up.error;
+        const { data, error } = await sb.from("todo_attachments").insert({
+          todo_id: todoId, household_id: hid, path,
+          name: (file.name || "Datei").slice(0, 255), size: file.size, mime: file.type || ""
+        }).select("id, todo_id, path, name, size, mime, created_at").single();
+        if (error) {
+          await sb.storage.from("todo-files").remove([path]);
+          throw error;
+        }
+        if (!td.files.has(todoId)) td.files.set(todoId, []);
+        td.files.get(todoId).push(data);
+        ok++;
+      }
+      if (ok) toast(ok === 1 ? "Anlage hinzugefügt." : `${ok} Anlagen hinzugefügt.`);
+    } catch (err) {
+      toast(/Bucket not found/i.test(err.message || "") ? "Speicherort fehlt – bitte das SQL aus Schritt 7 ausführen." : translateError(err), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "＋ Datei oder Foto hinzufügen";
+      renderFiles();
+      render();
+    }
+  }
+
+  async function removeStoredFiles(paths) {
+    if (!paths.length) return;
+    const { error } = await sb.storage.from("todo-files").remove(paths);
+    if (error) console.warn("Dateien konnten nicht gelöscht werden:", error);
+  }
+
+  $("#btn-add-file").addEventListener("click", () => $("#todo-file-input").click());
+  $("#todo-file-input").addEventListener("change", e => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    if (files.length) uploadFiles(files);
+  });
+
+  $("#todo-files").addEventListener("click", async e => {
+    const openBtn = e.target.closest("[data-open-file]");
+    const delBtn = e.target.closest("[data-del-file]");
+    const files = filesOf(td.editingId);
+
+    if (openBtn) {
+      const f = files.find(x => x.id === openBtn.dataset.openFile);
+      if (!f) return;
+      // Fenster sofort öffnen (sonst blockiert Safari), dann Adresse setzen
+      const win = window.open("", "_blank");
+      const { data, error } = await sb.storage.from("todo-files").createSignedUrl(f.path, 3600);
+      if (error) { if (win) win.close(); toast(translateError(error), true); return; }
+      if (win) win.location.href = data.signedUrl; else location.href = data.signedUrl;
+    }
+
+    if (delBtn) {
+      const f = files.find(x => x.id === delBtn.dataset.delFile);
+      if (!f || !confirm(`Anlage „${f.name}“ löschen?`)) return;
+      const { error } = await sb.from("todo_attachments").delete().eq("id", f.id);
+      if (error) { toast(translateError(error), true); return; }
+      await removeStoredFiles([f.path]);
+      td.files.set(td.editingId, files.filter(x => x.id !== f.id));
+      renderFiles();
+      render();
+    }
   });
 
   // ---------- Klicks ----------

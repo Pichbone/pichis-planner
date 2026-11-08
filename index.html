@@ -222,7 +222,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </form>
-      <p class="input-hint">Tipp: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>@Name</b>, <b>!</b> für wichtig, <b>#privat</b></p>
+      <p class="input-hint">Tipp: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>um 15 Uhr</b>, <b>für 1 Std</b>, <b>@Name</b>, <b>!</b> für wichtig, <b>#privat</b></p>
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
@@ -334,6 +334,27 @@
           </select>
         </label>
       </div>
+      <div class="form-row form-row-even">
+        <label>Uhrzeit
+          <input type="time" name="due_time" step="300">
+        </label>
+        <label>Dauer
+          <select name="duration_minutes">
+            <option value="">–</option>
+            <option value="15">15 Min.</option>
+            <option value="30">30 Min.</option>
+            <option value="45">45 Min.</option>
+            <option value="60">1 Std.</option>
+            <option value="90">1,5 Std.</option>
+            <option value="120">2 Std.</option>
+            <option value="180">3 Std.</option>
+            <option value="240">4 Std.</option>
+            <option value="360">6 Std.</option>
+            <option value="480">8 Std.</option>
+            <option value="1440">1 Tag</option>
+          </select>
+        </label>
+      </div>
       <label>Zuständig
         <select name="assigned_to"></select>
       </label>
@@ -343,6 +364,12 @@
       <div class="switches">
         <label class="switch"><input type="checkbox" name="priority"><span>❗ Wichtig</span></label>
         <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      </div>
+      <div class="todo-files-block">
+        <h3 class="sheet-sub">Anlagen</h3>
+        <ul class="file-list" id="todo-files"></ul>
+        <button type="button" class="btn btn-small" id="btn-add-file">＋ Datei oder Foto hinzufügen</button>
+        <input type="file" id="todo-file-input" multiple hidden>
       </div>
       <p class="muted small" id="todo-created"></p>
       <button type="submit" class="btn btn-primary">Speichern</button>
