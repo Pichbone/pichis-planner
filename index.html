@@ -508,6 +508,22 @@
     </form>
 
     <div class="panel-section">
+      <h3>Tägliche Zusammenfassung</h3>
+      <p class="muted small">Jeden Tag eine E-Mail mit deinen Terminen, fälligen Aufgaben und der Einkaufsliste – an <span id="digest-email"></span>.</p>
+      <form id="form-digest" class="form">
+        <label class="switch"><input type="checkbox" name="enabled"><span>Zusammenfassung per E-Mail</span></label>
+        <div id="digest-options" class="form">
+          <label>Uhrzeit
+            <input type="time" name="time" step="900" required>
+          </label>
+          <label class="switch"><input type="checkbox" name="skip_empty"><span>An Tagen ohne Termine, Aufgaben und Einkäufe auslassen</span></label>
+        </div>
+        <button type="submit" class="btn btn-secondary">Speichern</button>
+        <button type="button" class="link" id="btn-digest-test">Testmail jetzt senden</button>
+      </form>
+    </div>
+
+    <div class="panel-section">
       <h3>Haushalt</h3>
       <p class="muted small">Mit diesem Code treten Familienmitglieder nach der Registrierung bei.</p>
       <div class="invite-box">

@@ -99,7 +99,7 @@
   async function loadProfile() {
     const { data, error } = await sb
       .from("profiles")
-      .select("id, display_name")
+      .select("id, display_name, digest_enabled, digest_time, digest_skip_empty")
       .eq("id", state.session.user.id)
       .maybeSingle();
     if (error) throw error;
@@ -239,6 +239,7 @@
     $("#invite-code").textContent = state.household.invite_code;
     $("#btn-new-code").hidden = state.role !== "owner";
     $("#form-profile").name.value = state.profile.display_name;
+    renderDigestSettings();
     $("#app-version").textContent = cfg.APP_VERSION;
 
     renderInstallHint();
@@ -368,6 +369,67 @@
       applyView();
       toast("Name gespeichert.");
     });
+  });
+
+  // ---------- Tägliche Zusammenfassung ----------
+  function renderDigestSettings() {
+    const f = $("#form-digest");
+    const p = state.profile || {};
+    f.enabled.checked = !!p.digest_enabled;
+    f.time.value = String(p.digest_time || "06:30").slice(0, 5);
+    f.skip_empty.checked = !!p.digest_skip_empty;
+    $("#digest-options").hidden = !f.enabled.checked;
+    $("#digest-email").textContent = (state.session && state.session.user.email) || "deine Registrierungs-Adresse";
+  }
+
+  $("#form-digest").enabled.addEventListener("change", e => {
+    $("#digest-options").hidden = !e.target.checked;
+  });
+
+  $("#form-digest").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target;
+    withBusy(f, async () => {
+      const time = f.time.value || "06:30";
+      const now = new Date();
+      const nowHm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const update = {
+        digest_enabled: f.enabled.checked,
+        digest_time: time,
+        digest_skip_empty: f.skip_empty.checked
+      };
+      // Uhrzeit für heute schon vorbei? Dann geht die erste Mail morgen raus.
+      if (f.enabled.checked && time <= nowHm) update.digest_last_sent = today;
+      if (f.enabled.checked && time > nowHm) update.digest_last_sent = null;
+
+      const { error } = await sb.from("profiles").update(update).eq("id", state.session.user.id);
+      if (error) throw error;
+      Object.assign(state.profile, update);
+      toast(f.enabled.checked
+        ? `Gespeichert – die Zusammenfassung kommt täglich gegen ${time} Uhr.`
+        : "Gespeichert – keine täglichen Mails mehr.");
+    });
+  });
+
+  $("#btn-digest-test").addEventListener("click", async () => {
+    const btn = $("#btn-digest-test");
+    btn.disabled = true;
+    btn.textContent = "Wird gesendet …";
+    try {
+      const { data, error } = await sb.functions.invoke("digest", { body: { action: "test" } });
+      if (error) {
+        let msg = error.message;
+        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch { /* egal */ }
+        throw new Error(msg);
+      }
+      toast(`Testmail an ${data.to} gesendet.`);
+    } catch (err) {
+      toast(translateError(err), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Testmail jetzt senden";
+    }
   });
 
   $("#btn-copy-code").addEventListener("click", async () => {
