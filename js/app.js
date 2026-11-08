@@ -420,8 +420,22 @@
       const { data, error } = await sb.functions.invoke("digest", { body: { action: "test" } });
       if (error) {
         let msg = error.message;
-        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch { /* egal */ }
-        throw new Error(msg);
+        let status = "";
+        try {
+          const res = error.context;
+          if (res && res.status) status = res.status;
+          const raw = await res.text();
+          try {
+            const j = JSON.parse(raw);
+            msg = j.error || j.message || j.msg || raw || msg;
+          } catch { if (raw) msg = raw.slice(0, 200); }
+        } catch { /* keine Antwort lesbar */ }
+        if (status === 404) msg = "Die Funktion „digest“ wurde nicht gefunden (404). Bitte Name und Deploy in Supabase prüfen.";
+        if (status === 401) msg = "Zugriff verweigert (401). Bitte bei der Funktion „digest“ „Verify JWT“ ausschalten.";
+        throw new Error((status ? `[${status}] ` : "") + msg);
+      }
+      if (!data || !data.sent || !data.to) {
+        throw new Error("Die Funktion „digest“ hat nicht wie erwartet geantwortet. Ist der richtige Code deployed?");
       }
       toast(`Testmail an ${data.to} gesendet.`);
     } catch (err) {
