@@ -125,7 +125,10 @@
   <section id="screen-app" class="screen" hidden>
     <header class="topbar">
       <div class="topbar-title">
-        <img src="/icons/icon-192.png" alt="" class="logo-small">
+        <button class="icon-btn" id="btn-back" aria-label="Zurück" hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <img src="/icons/icon-192.png" alt="" class="logo-small" id="topbar-logo">
         <div>
           <div class="eyebrow" data-household-name></div>
           <div class="greeting" id="greeting"></div>
@@ -137,6 +140,8 @@
     </header>
 
     <main class="content">
+     <!-- ===== Startseite ===== -->
+     <div id="view-home" class="view">
       <div id="install-hint" class="banner" hidden>
         <div>
           <strong>Als App installieren:</strong>
@@ -147,11 +152,11 @@
 
       <h2 class="section-title">Bereiche</h2>
       <div class="tiles">
-        <div class="tile tile-shop">
+        <a class="tile tile-active" href="#/einkauf">
           <div class="tile-icon">🛒</div>
           <div class="tile-name">Einkaufsliste</div>
-          <div class="tile-status">Nächster Schritt</div>
-        </div>
+          <div class="tile-status" id="tile-shop-status">Öffnen</div>
+        </a>
         <div class="tile">
           <div class="tile-icon">✅</div>
           <div class="tile-name">ToDos</div>
@@ -183,8 +188,73 @@
       <div class="card">
         <ul id="member-list" class="member-list"></ul>
       </div>
+     </div>
+
+     <!-- ===== Einkaufsliste ===== -->
+     <div id="view-shopping" class="view" hidden>
+      <div class="chips" id="list-chips"></div>
+
+      <form id="form-add-item" class="add-bar" autocomplete="off">
+        <input type="text" name="text" list="shop-suggestions" maxlength="300"
+               placeholder="Hinzufügen, z. B. 2 Milch, Brot" enterkeyhint="done" aria-label="Artikel hinzufügen">
+        <button type="submit" class="add-btn" aria-label="Hinzufügen">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </form>
+      <datalist id="shop-suggestions"></datalist>
+
+      <div id="shop-items"></div>
+      <div id="shop-done" class="done-section"></div>
+     </div>
     </main>
   </section>
+
+  <!-- ===== Bearbeiten-Fenster (von unten) ===== -->
+  <div id="sheet-backdrop" class="backdrop" hidden></div>
+
+  <div id="sheet-item" class="sheet" hidden role="dialog" aria-label="Artikel bearbeiten">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Artikel</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-item" class="form">
+      <label>Name
+        <input type="text" name="name" required maxlength="80">
+      </label>
+      <div class="form-row">
+        <label>Menge
+          <input type="text" name="quantity" maxlength="20" placeholder="z. B. 2 oder 500 g">
+        </label>
+        <label>Kategorie
+          <select name="category"></select>
+        </label>
+      </div>
+      <label>Notiz
+        <input type="text" name="note" maxlength="200" placeholder="z. B. Bio, die vom Markt">
+      </label>
+      <label id="item-list-row">Liste
+        <select name="list"></select>
+      </label>
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <button type="button" class="link danger-link" id="btn-delete-item">Artikel löschen</button>
+    </form>
+  </div>
+
+  <div id="sheet-list" class="sheet" hidden role="dialog" aria-label="Liste bearbeiten">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="sheet-list-title">Liste</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-list" class="form">
+      <label>Name der Liste
+        <input type="text" name="name" required maxlength="40" placeholder="z. B. Drogerie, Baumarkt">
+      </label>
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <button type="button" class="link danger-link" id="btn-delete-list">Liste löschen</button>
+    </form>
+  </div>
 
   <!-- ===== Einstellungen (Seitenpanel) ===== -->
   <div id="settings-backdrop" class="backdrop" hidden></div>
@@ -223,5 +293,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>
+  <script src="/js/shopping.js"></script>
 </body>
 </html>

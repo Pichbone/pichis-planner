@@ -1,5 +1,6 @@
 // =========================================================
-// Pichis Planner – App-Logik (Schritt 1: Login & Haushalt)
+// Pichis Planner – App-Kern
+// Anmeldung, Haushalt, Navigation, gemeinsame Hilfsfunktionen
 // =========================================================
 
 (() => {
@@ -23,7 +24,9 @@
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
   const screens = ["loading", "auth", "recovery", "household", "app"];
+  let currentScreen = "loading";
   function show(name) {
+    currentScreen = name;
     screens.forEach(s => { $("#screen-" + s).hidden = s !== name; });
   }
 
@@ -50,7 +53,7 @@
     if (/already registered|already exists/i.test(m)) return "Diese E-Mail-Adresse ist bereits registriert.";
     if (/Password should be at least/i.test(m)) return "Das Passwort muss mindestens 8 Zeichen haben.";
     if (/rate limit|too many/i.test(m)) return "Zu viele Versuche. Bitte warte kurz und versuche es erneut.";
-    if (/Failed to fetch|NetworkError/i.test(m)) return "Keine Verbindung. Bitte Internet prüfen.";
+    if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Keine Verbindung. Bitte Internet prüfen.";
     return m;
   }
 
@@ -64,6 +67,33 @@
 
   function storageGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
   function storageSet(key, val) { try { localStorage.setItem(key, val); } catch { /* egal */ } }
+
+  function memberName(userId) {
+    const m = state.members.find(x => x.id === userId);
+    return m ? m.name : "";
+  }
+
+  // ---------- Bottom-Sheets (Bearbeiten-Fenster) ----------
+  function openSheet(id) {
+    $$(".sheet").forEach(s => { s.hidden = s.id !== id; });
+    $("#sheet-backdrop").hidden = false;
+    const first = $("#" + id + " input");
+    if (first && !matchMedia("(pointer: coarse)").matches) first.focus();
+  }
+  function closeSheets() {
+    $$(".sheet").forEach(s => { s.hidden = true; });
+    $("#sheet-backdrop").hidden = true;
+  }
+  $("#sheet-backdrop").addEventListener("click", closeSheets);
+  $$("[data-close-sheet]").forEach(b => b.addEventListener("click", closeSheets));
+
+  // ---------- Gemeinsame Schnittstelle für Module ----------
+  const modules = {};
+  window.PP = {
+    sb, state, cfg, modules,
+    $, $$, toast, escapeHtml, translateError, withBusy,
+    storageGet, storageSet, memberName, openSheet, closeSheets
+  };
 
   // ---------- Daten laden ----------
   async function loadProfile() {
@@ -90,7 +120,6 @@
       return;
     }
 
-    // Zuletzt gewählten Haushalt bevorzugen (für später, falls es mehrere gibt)
     const lastId = storageGet("pp_household");
     const entry = data.find(d => d.households && d.households.id === lastId) || data[0];
     state.household = entry.households;
@@ -138,6 +167,7 @@
       await loadMembers();
       renderApp();
       show("app");
+      applyView();
     } catch (err) {
       console.error(err);
       toast(translateError(err), true);
@@ -146,6 +176,42 @@
       routing = false;
     }
   }
+
+  // ---------- Ansichten innerhalb der App ----------
+  const VIEWS = {
+    "": { id: "home", title: null },
+    "einkauf": { id: "shopping", title: "Einkaufsliste", module: "shopping" }
+  };
+  let activeView = null;
+
+  function applyView() {
+    if (currentScreen !== "app") return;
+    const key = (location.hash || "").replace(/^#\/?/, "");
+    const view = VIEWS[key] || VIEWS[""];
+
+    $$(".view").forEach(v => { v.hidden = v.id !== "view-" + view.id; });
+    $("#btn-back").hidden = view.id === "home";
+    $("#topbar-logo").hidden = view.id !== "home";
+    $("#greeting").textContent = view.title || greetingText();
+
+    if (activeView && activeView !== view && activeView.module && modules[activeView.module]) {
+      modules[activeView.module].leave();
+    }
+    activeView = view;
+
+    if (view.module && modules[view.module]) {
+      modules[view.module].enter();
+    } else {
+      Object.values(modules).forEach(m => m.refreshTile && m.refreshTile());
+    }
+    window.scrollTo(0, 0);
+  }
+
+  window.addEventListener("hashchange", applyView);
+  $("#btn-back").addEventListener("click", () => {
+    if (history.length > 1 && location.hash) history.back();
+    else location.hash = "";
+  });
 
   // ---------- Darstellung ----------
   function greetingText() {
@@ -158,7 +224,6 @@
 
   function renderApp() {
     $$("[data-household-name]").forEach(el => { el.textContent = state.household.name; });
-    $("#greeting").textContent = greetingText();
 
     const me = state.session.user.id;
     $("#member-list").innerHTML = state.members.map(m => `
@@ -298,6 +363,7 @@
       state.profile.display_name = name;
       await loadMembers();
       renderApp();
+      applyView();
       toast("Name gespeichert.");
     });
   });
@@ -360,26 +426,38 @@
 
   // ---------- Start ----------
   let recoveryMode = false;
-  sb.auth.onAuthStateChange((event, session) => {
-    state.session = session;
-    // Supabase-Aufrufe nicht direkt im Callback ausführen
-    setTimeout(() => {
-      if (event === "PASSWORD_RECOVERY") { recoveryMode = true; show("recovery"); return; }
-      if (recoveryMode) return; // erst neues Passwort setzen
-      if (event === "SIGNED_OUT") {
-        state.profile = state.household = null;
-        state.members = [];
-        showAuthPanel("login");
-        show("auth");
-        return;
-      }
-      if (event === "INITIAL_SESSION" || event === "SIGNED_IN") route();
-    }, 0);
-  });
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(err => console.warn("Service Worker:", err));
+  function start() {
+    sb.auth.onAuthStateChange((event, session) => {
+      state.session = session;
+      // Supabase-Aufrufe nicht direkt im Callback ausführen
+      setTimeout(() => {
+        if (event === "PASSWORD_RECOVERY") { recoveryMode = true; show("recovery"); return; }
+        if (recoveryMode) return; // erst neues Passwort setzen
+        if (event === "SIGNED_OUT") {
+          Object.values(modules).forEach(m => m.reset && m.reset());
+          activeView = null;
+          state.profile = state.household = null;
+          state.members = [];
+          showAuthPanel("login");
+          show("auth");
+          return;
+        }
+        if (event === "INITIAL_SESSION" || event === "SIGNED_IN") route();
+      }, 0);
     });
+
+    // Beim Zurückkehren in die App (iPhone schließt Verbindungen im Hintergrund)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || currentScreen !== "app") return;
+      Object.values(modules).forEach(m => m.resume && m.resume());
+    });
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(err => console.warn("Service Worker:", err));
+    }
   }
+
+  // Erst starten, wenn alle Module geladen sind
+  document.addEventListener("DOMContentLoaded", start);
 })();
