@@ -445,6 +445,99 @@ select {
 .done-head .link { padding: 6px 4px; align-self: auto; font-weight: 600; }
 .done-toggle { color: var(--muted); }
 
+/* ---------- Aufgaben ---------- */
+.tile-green { border-color: var(--green); background: var(--green-soft); }
+.tile-green .tile-status { color: var(--green); }
+.add-bar-green .add-btn { background: var(--green); }
+@media (prefers-color-scheme: dark) { .add-bar-green .add-btn { color: #10201B; } }
+
+.add-bar-green { padding-bottom: 6px; }
+.input-hint { font-size: .78rem; color: var(--muted); margin: 0 4px 16px; line-height: 1.5; }
+.input-hint b { font-weight: 600; color: var(--ink); }
+
+.cat-count {
+  font-size: .72rem;
+  background: var(--surface-2);
+  color: var(--muted);
+  padding: 0 7px;
+  border-radius: 99px;
+  letter-spacing: 0;
+}
+.title-overdue { color: var(--danger); }
+.title-overdue .cat-count { background: var(--danger); color: #fff; }
+.due-overdue { color: var(--danger); font-weight: 600; }
+.prio { color: var(--orange); font-weight: 800; margin-right: 6px; }
+.item.important .check::before { border-color: var(--orange); }
+.item.done .prio { color: var(--muted); }
+
+.item-side { display: flex; align-items: center; padding-right: 14px; }
+.avatar-sm { width: 28px; height: 28px; font-size: .8rem; }
+
+textarea {
+  font: inherit;
+  font-size: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+  resize: vertical;
+}
+textarea:focus, select:focus { outline: 2px solid var(--green); outline-offset: 1px; border-color: transparent; }
+input[type="date"] {
+  font: inherit;
+  font-size: 16px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+  min-height: 48px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.form-row-even { grid-template-columns: 1fr 1fr; }
+
+.switches { display: flex; flex-direction: column; gap: 4px; }
+.form .switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.switch input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 46px;
+  height: 28px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.switch input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  transition: transform .15s ease;
+}
+.switch input:checked { background: var(--green); border-color: var(--green); }
+.switch input:checked::after { transform: translateX(18px); }
+.switch input:disabled { opacity: .45; cursor: default; }
+
 /* ---------- Bottom-Sheet ---------- */
 .sheet {
   position: fixed;

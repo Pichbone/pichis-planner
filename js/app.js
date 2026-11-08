@@ -180,7 +180,8 @@
   // ---------- Ansichten innerhalb der App ----------
   const VIEWS = {
     "": { id: "home", title: null },
-    "einkauf": { id: "shopping", title: "Einkaufsliste", module: "shopping" }
+    "einkauf": { id: "shopping", title: "Einkaufsliste", module: "shopping" },
+    "aufgaben": { id: "todos", title: "Aufgaben", module: "todos" }
   };
   let activeView = null;
 
