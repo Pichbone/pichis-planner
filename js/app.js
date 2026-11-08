@@ -99,7 +99,7 @@
   async function loadProfile() {
     const { data, error } = await sb
       .from("profiles")
-      .select("id, display_name, digest_enabled, digest_time, digest_skip_empty")
+      .select("id, display_name, digest_enabled, digest_time, digest_skip_empty, push_messages, push_tasks")
       .eq("id", state.session.user.id)
       .maybeSingle();
     if (error) throw error;
@@ -183,7 +183,8 @@
     "einkauf": { id: "shopping", title: "Einkaufsliste", module: "shopping" },
     "aufgaben": { id: "todos", title: "Aufgaben", module: "todos" },
     "kalender": { id: "calendar", title: "Kalender", module: "calendar" },
-    "medien": { id: "media", title: "Neue Medien", module: "media" }
+    "medien": { id: "media", title: "Neue Medien", module: "media" },
+    "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" }
   };
   let activeView = null;
 

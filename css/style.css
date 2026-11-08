@@ -853,3 +853,63 @@ input[type="date"], input[type="time"] {
   font-size: .95rem;
 }
 .toast.error { background: var(--danger); color: #fff; }
+
+/* ---------- Nachrichten ---------- */
+:root { --teal: #0F766E; --teal-soft: #DDF0EE; }
+@media (prefers-color-scheme: dark) { :root { --teal: #5CC1B6; --teal-soft: #193330; } }
+.tile-teal { border-color: var(--teal); background: var(--teal-soft); }
+.tile-teal .tile-status { color: var(--teal); }
+.tile-status.tile-badge { color: #fff !important; background: var(--orange); align-self: flex-start; padding: 1px 8px; border-radius: 99px; }
+
+#view-messages:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: 320px;
+}
+.msg-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 2px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.msg-list .empty { margin: auto 0; }
+.msg-day { align-self: center; font-size: .75rem; font-weight: 600; color: var(--muted); background: var(--surface-2); padding: 3px 10px; border-radius: 99px; margin: 12px 0 6px; }
+.msg { display: flex; }
+.msg.mine { justify-content: flex-end; }
+.bubble {
+  max-width: 78%;
+  padding: 8px 12px 6px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.msg.mine .bubble { background: var(--green); border-color: var(--green); color: #fff; border-bottom-right-radius: 5px; cursor: pointer; }
+.msg.theirs .bubble { border-bottom-left-radius: 5px; }
+.msg-name { font-size: .75rem; font-weight: 700; color: var(--teal); }
+.msg-body { line-height: 1.4; }
+.msg-body a { color: inherit; text-decoration: underline; }
+.msg-time { font-size: .68rem; opacity: .7; align-self: flex-end; }
+@media (prefers-color-scheme: dark) { .msg.mine .bubble { color: #10201B; } }
+
+.msg-composer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.msg-composer textarea { flex: 1; resize: none; min-height: 46px; max-height: 140px; border-radius: 22px; padding: 11px 16px; background: var(--surface); }
+.msg-send { height: 46px; width: 46px; border-radius: 50%; background: var(--teal); }
+
+.push-prefs { margin-top: 12px; gap: 2px; }

@@ -1,6 +1,6 @@
 // Pichis Planner – Service Worker
 // Bei jeder Änderung an App-Dateien die Versionsnummer erhöhen.
-const CACHE = "pp-shell-v0.7.0";
+const CACHE = "pp-shell-v0.8.0";
 
 const SHELL = [
   "/",
@@ -12,6 +12,8 @@ const SHELL = [
   "/js/todos.js",
   "/js/calendar.js",
   "/js/media.js",
+  "/js/messages.js",
+  "/js/notify.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -56,4 +58,35 @@ self.addEventListener("fetch", event => {
           .then(res => res || Response.error())
       )
   );
+});
+
+// ---------- Push-Mitteilungen ----------
+self.addEventListener("push", event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
+  const title = data.title || "Pichis Planner";
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+    data: { url: data.url || "/" }
+  }));
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of all) {
+      if (new URL(c.url).origin === self.location.origin) {
+        await c.focus();
+        try { await c.navigate(target); } catch { c.postMessage({ type: "navigate", url: target }); }
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
 });

@@ -210,6 +210,7 @@
     if (error) throw error;
     upsertLocal(data);
     render();
+    if (data.assigned_to && data.assigned_to !== state.session.user.id && PP.notify) PP.notify.task(data.id);
 
     const extras = [];
     if (data.due_date) extras.push(dueLabel(data.due_date));
@@ -409,9 +410,14 @@
       if (payload.repeat !== "none" && !payload.due_date) payload.due_date = isoDate(startOfToday());
       if (payload.due_time && !payload.due_date) payload.due_date = isoDate(startOfToday());
 
+      const before = td.items.find(x => x.id === td.editingId);
+      const prevAssignee = before ? before.assigned_to : null;
       const { data, error } = await sb.from("todos").update(payload).eq("id", td.editingId).select().single();
       if (error) throw error;
       upsertLocal(data);
+      if (data.assigned_to && data.assigned_to !== prevAssignee && data.assigned_to !== state.session.user.id && PP.notify) {
+        PP.notify.task(data.id);
+      }
       closeSheets();
       render();
     });

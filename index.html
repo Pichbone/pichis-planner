@@ -167,6 +167,16 @@
           <div class="tile-name">Kalender</div>
           <div class="tile-status">iCloud · Öffnen</div>
         </a>
+        <a class="tile tile-active tile-teal" href="#/nachrichten">
+          <div class="tile-icon">💬</div>
+          <div class="tile-name">Nachrichten</div>
+          <div class="tile-status" id="tile-msg-status">Öffnen</div>
+        </a>
+        <a class="tile tile-active tile-purple" href="#/medien">
+          <div class="tile-icon">🎬</div>
+          <div class="tile-name">Neue Medien</div>
+          <div class="tile-status" id="tile-media-status">Öffnen</div>
+        </a>
         <div class="tile">
           <div class="tile-icon">✉️</div>
           <div class="tile-name">Einladungen</div>
@@ -177,11 +187,6 @@
           <div class="tile-name">Aufgaben per Mail</div>
           <div class="tile-status">Bald</div>
         </div>
-        <a class="tile tile-active tile-purple" href="#/medien">
-          <div class="tile-icon">🎬</div>
-          <div class="tile-name">Neue Medien</div>
-          <div class="tile-status" id="tile-media-status">Öffnen</div>
-        </a>
       </div>
 
       <h2 class="section-title">Familie</h2>
@@ -226,6 +231,18 @@
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
+     </div>
+
+     <!-- ===== Nachrichten ===== -->
+     <div id="view-messages" class="view" hidden>
+      <div class="chips" id="msg-threads"></div>
+      <ul class="msg-list" id="msg-list"></ul>
+      <form id="form-msg" class="msg-composer" autocomplete="off">
+        <textarea id="msg-input" rows="1" maxlength="2000" aria-label="Nachricht" enterkeyhint="send"></textarea>
+        <button type="submit" class="add-btn msg-send" id="btn-msg-send" aria-label="Senden">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg>
+        </button>
+      </form>
      </div>
 
      <!-- ===== Neue Medien ===== -->
@@ -598,6 +615,19 @@
     </form>
 
     <div class="panel-section">
+      <h3>Mitteilungen aufs Handy</h3>
+      <p class="muted small" id="push-status"></p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-secondary" id="btn-push-toggle">Auf diesem Gerät einschalten</button>
+        <button type="button" class="link" id="btn-push-test" hidden>Test-Mitteilung</button>
+      </div>
+      <form id="form-push-prefs" class="form push-prefs">
+        <label class="switch"><input type="checkbox" name="push_messages"><span>💬 Neue Nachrichten</span></label>
+        <label class="switch"><input type="checkbox" name="push_tasks"><span>✅ Mir wurde eine Aufgabe zugewiesen</span></label>
+      </form>
+    </div>
+
+    <div class="panel-section">
       <h3>Tägliche Zusammenfassung</h3>
       <p class="muted small">Jeden Tag eine E-Mail mit deinen Terminen, fälligen Aufgaben und der Einkaufsliste – an <span id="digest-email"></span>.</p>
       <form id="form-digest" class="form">
@@ -635,9 +665,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>
+  <script src="/js/notify.js"></script>
   <script src="/js/shopping.js"></script>
   <script src="/js/todos.js"></script>
   <script src="/js/calendar.js"></script>
   <script src="/js/media.js"></script>
+  <script src="/js/messages.js"></script>
 </body>
 </html>
