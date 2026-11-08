@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pichis Planner</title>
+  <meta name="description" content="Familien-Planer: Kalender, ToDos, Einkaufsliste und mehr.">
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#2F5D50">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Pichis Planner">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- ===== Ladeansicht ===== -->
+  <section id="screen-loading" class="screen screen-center">
+    <img src="/icons/icon-192.png" alt="" class="logo-big">
+    <p class="muted">Lädt …</p>
+  </section>
+
+  <!-- ===== Anmelden / Registrieren ===== -->
+  <section id="screen-auth" class="screen screen-center" hidden>
+    <div class="card auth-card">
+      <div class="brand">
+        <img src="/icons/icon-192.png" alt="" class="logo">
+        <h1>Pichis Planner</h1>
+        <p class="muted">Kalender, ToDos und Einkäufe für die ganze Familie</p>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="login" role="tab">Anmelden</button>
+        <button class="tab" data-tab="register" role="tab">Registrieren</button>
+      </div>
+
+      <!-- Anmelden -->
+      <form id="form-login" class="form" data-panel="login">
+        <label>E-Mail
+          <input type="email" name="email" autocomplete="email" required>
+        </label>
+        <label>Passwort
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Anmelden</button>
+        <button type="button" class="link" id="btn-show-forgot">Passwort vergessen?</button>
+      </form>
+
+      <!-- Registrieren -->
+      <form id="form-register" class="form" data-panel="register" hidden>
+        <label>Dein Name
+          <input type="text" name="name" autocomplete="given-name" required maxlength="40">
+        </label>
+        <label>E-Mail
+          <input type="email" name="email" autocomplete="email" required>
+        </label>
+        <label>Passwort <span class="hint">(mind. 8 Zeichen)</span>
+          <input type="password" name="password" autocomplete="new-password" minlength="8" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Konto anlegen</button>
+      </form>
+
+      <!-- Passwort vergessen -->
+      <form id="form-forgot" class="form" data-panel="forgot" hidden>
+        <p class="muted">Wir schicken dir einen Link, mit dem du ein neues Passwort setzen kannst.</p>
+        <label>E-Mail
+          <input type="email" name="email" autocomplete="email" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Link senden</button>
+        <button type="button" class="link" data-back-login>Zurück zur Anmeldung</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== Neues Passwort setzen (nach Link aus der Mail) ===== -->
+  <section id="screen-recovery" class="screen screen-center" hidden>
+    <div class="card auth-card">
+      <h2>Neues Passwort</h2>
+      <form id="form-recovery" class="form">
+        <label>Neues Passwort <span class="hint">(mind. 8 Zeichen)</span>
+          <input type="password" name="password" autocomplete="new-password" minlength="8" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Passwort speichern</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== Haushalt anlegen oder beitreten ===== -->
+  <section id="screen-household" class="screen screen-center" hidden>
+    <div class="card auth-card">
+      <h2>Willkommen, <span data-user-name></span>!</h2>
+      <p class="muted">Lege einen Haushalt für deine Familie an oder tritt mit einem Einladungscode bei.</p>
+
+      <form id="form-create-household" class="form">
+        <label>Name des Haushalts
+          <input type="text" name="name" placeholder="z. B. Familie Pichowicz" required maxlength="60">
+        </label>
+        <button type="submit" class="btn btn-primary">Haushalt anlegen</button>
+      </form>
+
+      <div class="divider"><span>oder</span></div>
+
+      <form id="form-join-household" class="form">
+        <label>Einladungscode
+          <input type="text" name="code" placeholder="8 Zeichen" required maxlength="8"
+                 autocapitalize="characters" autocomplete="off" class="code-input">
+        </label>
+        <button type="submit" class="btn btn-secondary">Beitreten</button>
+      </form>
+
+      <button type="button" class="link" data-logout>Abmelden</button>
+    </div>
+  </section>
+
+  <!-- ===== Hauptansicht ===== -->
+  <section id="screen-app" class="screen" hidden>
+    <header class="topbar">
+      <div class="topbar-title">
+        <img src="/icons/icon-192.png" alt="" class="logo-small">
+        <div>
+          <div class="eyebrow" data-household-name></div>
+          <div class="greeting" id="greeting"></div>
+        </div>
+      </div>
+      <button class="icon-btn" id="btn-open-settings" aria-label="Einstellungen">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      </button>
+    </header>
+
+    <main class="content">
+      <div id="install-hint" class="banner" hidden>
+        <div>
+          <strong>Als App installieren:</strong>
+          <span id="install-hint-text"></span>
+        </div>
+        <button class="icon-btn small" id="btn-dismiss-install" aria-label="Hinweis schließen">✕</button>
+      </div>
+
+      <h2 class="section-title">Bereiche</h2>
+      <div class="tiles">
+        <div class="tile tile-shop">
+          <div class="tile-icon">🛒</div>
+          <div class="tile-name">Einkaufsliste</div>
+          <div class="tile-status">Nächster Schritt</div>
+        </div>
+        <div class="tile">
+          <div class="tile-icon">✅</div>
+          <div class="tile-name">ToDos</div>
+          <div class="tile-status">Bald</div>
+        </div>
+        <div class="tile">
+          <div class="tile-icon">📅</div>
+          <div class="tile-name">Kalender</div>
+          <div class="tile-status">Bald</div>
+        </div>
+        <div class="tile">
+          <div class="tile-icon">✉️</div>
+          <div class="tile-name">Einladungen</div>
+          <div class="tile-status">Bald</div>
+        </div>
+        <div class="tile">
+          <div class="tile-icon">📥</div>
+          <div class="tile-name">Aufgaben per Mail</div>
+          <div class="tile-status">Bald</div>
+        </div>
+        <div class="tile">
+          <div class="tile-icon">🎬</div>
+          <div class="tile-name">Neuerscheinungen</div>
+          <div class="tile-status">Bald</div>
+        </div>
+      </div>
+
+      <h2 class="section-title">Familie</h2>
+      <div class="card">
+        <ul id="member-list" class="member-list"></ul>
+      </div>
+    </main>
+  </section>
+
+  <!-- ===== Einstellungen (Seitenpanel) ===== -->
+  <div id="settings-backdrop" class="backdrop" hidden></div>
+  <aside id="settings-panel" class="panel" hidden aria-label="Einstellungen">
+    <div class="panel-head">
+      <h2>Einstellungen</h2>
+      <button class="icon-btn" id="btn-close-settings" aria-label="Schließen">✕</button>
+    </div>
+
+    <form id="form-profile" class="form">
+      <label>Dein Anzeigename
+        <input type="text" name="name" required maxlength="40">
+      </label>
+      <button type="submit" class="btn btn-secondary">Name speichern</button>
+    </form>
+
+    <div class="panel-section">
+      <h3>Haushalt</h3>
+      <p class="muted small">Mit diesem Code treten Familienmitglieder nach der Registrierung bei.</p>
+      <div class="invite-box">
+        <span id="invite-code" class="invite-code">––––––––</span>
+        <button type="button" class="btn btn-small" id="btn-copy-code">Kopieren</button>
+      </div>
+      <button type="button" class="link" id="btn-new-code" hidden>Neuen Code erzeugen</button>
+    </div>
+
+    <div class="panel-section">
+      <button type="button" class="btn btn-ghost" data-logout>Abmelden</button>
+      <p class="muted small version">Version <span id="app-version"></span></p>
+    </div>
+  </aside>
+
+  <!-- Meldungen -->
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
