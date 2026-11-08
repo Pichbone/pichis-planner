@@ -25,6 +25,10 @@
     selected: isoDate(new Date()),
     hidden: new Set(JSON.parse(storageGet("pp_cal_hidden") || "[]")),
     tagFilter: storageGet("pp_cal_tag") || "",
+    showTodos: storageGet("pp_cal_todos") === "1",
+    showShopping: storageGet("pp_cal_shop") === "1",
+    todos: [],
+    shopping: [],
     loading: false,
     channel: null,
     editing: null,            // Termin im Detail-Fenster
@@ -72,6 +76,7 @@
     const hid = state.household.id;
     const [me, cals, tags, metas] = await Promise.all([
       callIcloud("status").catch(err => { toast(err.message, true); return null; }),
+      // "kind" (für Kalender-Abos) wird erst mit Schritt 9 (SQL) abgefragt – Abos sind vorerst zurückgestellt
       sb.from("calendars").select("id, user_id, name, color, share_with_household, read_only").order("name"),
       sb.from("event_tags").select("id, name, color").eq("household_id", hid).order("name"),
       sb.from("event_meta").select("id, calendar_id, uid, tag_ids, member_ids").eq("household_id", hid)
@@ -92,7 +97,50 @@
     return { start, end: addDays(start, 42), key: isoDate(start) };
   }
 
+  // Aufgaben und Einkaufsliste für die Kalenderansicht (nur wenn eingeschaltet)
+  async function loadExtras() {
+    const hid = state.household.id;
+    const { start, end } = rangeOf(cal.month);
+    const today = isoDate(new Date());
+    const jobs = [];
+    if (cal.showTodos) {
+      jobs.push(sb.from("todos")
+        .select("id, title, due_date, due_time, duration_minutes, is_done, priority, assigned_to, is_private")
+        .eq("household_id", hid)
+        .or(`and(due_date.gte.${isoDate(start)},due_date.lt.${isoDate(end)}),and(due_date.lt.${today},is_done.eq.false)`)
+        .then(r => { cal.todos = r.error ? [] : r.data; }));
+    } else {
+      cal.todos = [];
+    }
+    if (cal.showShopping) {
+      jobs.push(Promise.all([
+        sb.from("shopping_lists").select("id, name, sort_order").eq("household_id", hid).order("sort_order"),
+        sb.from("shopping_items").select("list_id, name, quantity").eq("household_id", hid).eq("is_done", false).order("created_at")
+      ]).then(([l, i]) => {
+        cal.shopping = (l.data || []).map(list => ({
+          list, items: (i.data || []).filter(x => x.list_id === list.id)
+        })).filter(x => x.items.length);
+      }));
+    } else {
+      cal.shopping = [];
+    }
+    await Promise.all(jobs);
+  }
+
+  function todosOn(iso) {
+    const today = isoDate(new Date());
+    return cal.todos.filter(t =>
+      t.due_date === iso || (iso === today && t.due_date < today && !t.is_done))
+      .sort((a, b) => {
+        if (a.is_done !== b.is_done) return a.is_done ? 1 : -1;
+        if ((a.due_date < today) !== (b.due_date < today)) return a.due_date < today ? -1 : 1;
+        if (a.due_time !== b.due_time) return !a.due_time ? 1 : !b.due_time ? -1 : a.due_time < b.due_time ? -1 : 1;
+        return b.priority - a.priority;
+      });
+  }
+
   async function loadEvents(force = false) {
+    loadExtras().then(() => render()).catch(err => console.warn(err));
     const { start, end, key } = rangeOf(cal.month);
     const token = ++cal.loadToken;
 
@@ -257,7 +305,8 @@
       if (d.getMonth() !== cal.month.getMonth()) cls.push("other");
       if (iso === today) cls.push("today");
       if (iso === cal.selected) cls.push("selected");
-      const dots = list.slice(0, 4).map(ev => `<i style="background:${escapeHtml(ev.calendar_color)}"></i>`).join("");
+      const dots = list.slice(0, 4).map(ev => `<i style="background:${escapeHtml(ev.calendar_color)}"></i>`).join("") +
+        (cal.showTodos && cal.todos.some(t => t.due_date === iso && !t.is_done) ? '<i class="todo-dot"></i>' : "");
       grid += `<button class="${cls.join(" ")}" data-day="${iso}" aria-label="${longDate(iso)}, ${list.length} Termine">
         <span class="num">${d.getDate()}</span><span class="dots">${dots}${list.length > 4 ? "<b>+</b>" : ""}</span>
       </button>`;
@@ -285,6 +334,45 @@
           </button></li>`;
         }).join("")}</ul>`
       : `<p class="muted cal-empty">${cal.loading ? "Termine werden geladen …" : "Keine Termine."}</p>`;
+
+    // Aufgaben des Tages
+    let extra = "";
+    if (cal.showTodos) {
+      const tds = todosOn(cal.selected);
+      if (tds.length) {
+        extra += `<h4 class="cal-sub">✅ Aufgaben</h4><ul class="events">${tds.map(t => {
+          const overdue = !t.is_done && t.due_date < today;
+          let when = t.due_time ? String(t.due_time).slice(0, 5) : "";
+          if (when && t.duration_minutes) {
+            const [h, m] = when.split(":").map(Number);
+            const e = h * 60 + m + t.duration_minutes;
+            if (e < 1440) when += `–${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`;
+          }
+          const who = t.assigned_to && memberName(t.assigned_to) ? avatar(t.assigned_to) : "";
+          return `<li class="cal-todo${t.is_done ? " done" : ""}">
+            <button class="check-btn${t.is_done ? " on" : ""}" data-cal-todo="${t.id}" aria-label="Erledigt">✓</button>
+            <a class="cal-todo-main" href="#/aufgaben">
+              <span class="event-title">${t.priority ? '<span class="prio">!</span>' : ""}${escapeHtml(t.title)}</span>
+              <span class="event-sub">${overdue ? `<span class="due-overdue">überfällig seit ${escapeHtml(longDate(t.due_date))}</span>` : (when || "Ganztägig")}${t.is_private ? " · 🔒" : ""}</span>
+            </a>
+            ${who}
+          </li>`;
+        }).join("")}</ul>`;
+      }
+    }
+
+    // Einkaufsliste (am heutigen Tag)
+    if (cal.showShopping && cal.selected === today && cal.shopping.length) {
+      extra += `<h4 class="cal-sub">🛒 Einkaufsliste</h4>` + cal.shopping.map(s => {
+        const names = s.items.slice(0, 12).map(i => (i.quantity ? i.quantity + " " : "") + i.name);
+        return `<a class="cal-shop" href="#/einkauf">
+          <span class="event-title">${escapeHtml(s.list.name)} <span class="chip-count">${s.items.length}</span></span>
+          <span class="event-sub">${escapeHtml(names.join(", "))}${s.items.length > 12 ? " …" : ""}</span>
+        </a>`;
+      }).join("");
+    }
+    $("#cal-day-extra").innerHTML = extra;
+    if (extra && !dayList.length && !cal.loading) $("#cal-day-list").innerHTML = `<p class="muted cal-empty">Keine Termine.</p>`;
   }
 
   // ---------- Termin-Fenster: ansehen, anlegen, bearbeiten ----------
@@ -668,13 +756,14 @@
 
     const row = (c, own) => `<li class="cal-row">
       <i class="cal-dot" style="background:${escapeHtml(c.color)}"></i>
-      <span class="cal-name">${escapeHtml(c.name)}${c.read_only ? ' <span class="muted small">(nur lesen)</span>' : ""}</span>
+      <span class="cal-name">${escapeHtml(c.name)}${c.kind === "ics" ? ' <span class="muted small">(Abo)</span>' : c.read_only ? ' <span class="muted small">(nur lesen)</span>' : ""}</span>
       <label class="switch switch-sm" title="In der App anzeigen">
         <input type="checkbox" data-cal-show="${c.id}" ${cal.hidden.has(c.id) ? "" : "checked"}><span class="small">Anzeigen</span>
       </label>
       ${own ? `<label class="switch switch-sm" title="Für die Familie sichtbar">
         <input type="checkbox" data-cal-share="${c.id}" ${c.share_with_household ? "checked" : ""}><span class="small">Familie</span>
       </label>` : ""}
+      ${own && c.kind === "ics" ? `<button class="icon-btn small" data-del-feed="${c.id}" aria-label="Abo entfernen" title="Abo entfernen">✕</button>` : ""}
     </li>`;
 
     $("#cal-list-mine").innerHTML = mine.length ? mine.map(c => row(c, true)).join("") : `<li class="muted small">–</li>`;
@@ -687,6 +776,9 @@
           `<li class="cal-owner">${escapeHtml(memberName(uid) || "Familie")}</li>` + list.map(c => row(c, false)).join("")).join("")
       : `<li class="muted small">Noch keine freigegebenen Kalender von anderen.</li>`;
 
+    $("#cal-show-todos").checked = cal.showTodos;
+    $("#cal-show-shop").checked = cal.showShopping;
+
     $("#cal-tag-list").innerHTML = cal.tags.length
       ? cal.tags.map(t => `<li class="cal-row">${tagChip(t)}<button class="icon-btn small" data-del-tag="${t.id}" aria-label="Tag löschen">✕</button></li>`).join("")
       : `<li class="muted small">Noch keine Tags. Tags vergibst du, indem du einen Termin antippst.</li>`;
@@ -694,6 +786,15 @@
 
   $("#sheet-calsettings").addEventListener("change", async e => {
     const t = e.target;
+    if (t.id === "cal-show-todos" || t.id === "cal-show-shop") {
+      cal.showTodos = $("#cal-show-todos").checked;
+      cal.showShopping = $("#cal-show-shop").checked;
+      storageSet("pp_cal_todos", cal.showTodos ? "1" : "0");
+      storageSet("pp_cal_shop", cal.showShopping ? "1" : "0");
+      await loadExtras();
+      render();
+      return;
+    }
     if (t.dataset.calShow) {
       t.checked ? cal.hidden.delete(t.dataset.calShow) : cal.hidden.add(t.dataset.calShow);
       storageSet("pp_cal_hidden", JSON.stringify([...cal.hidden]));
@@ -727,6 +828,19 @@
       } catch (err) { toast(err.message, true); }
       finally { t.disabled = false; }
     }
+    if (t.dataset.delFeed) {
+      const c = cal.calendars.find(x => x.id === t.dataset.delFeed);
+      if (!c || !confirm(`Abo „${c.name}“ entfernen?`)) return;
+      try {
+        cal.me = await callIcloud("remove_feed", { calendar_id: c.id });
+        await loadBase();
+        renderSettings();
+        cal.cache.clear();
+        loadEvents(true);
+        toast("Abo entfernt.");
+      } catch (err) { toast(err.message, true); }
+      return;
+    }
     if (t.dataset.delTag) {
       const tag = cal.tags.find(x => x.id === t.dataset.delTag);
       if (!tag || !confirm(`Tag „${tag.name}“ löschen? Er wird bei allen Terminen entfernt.`)) return;
@@ -737,6 +851,26 @@
       renderSettings();
       render();
     }
+  });
+
+  $("#form-feed").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target;
+    PP.withBusy(f, async () => {
+      const r = await callIcloud("add_feed", {
+        name: f.name.value.trim(),
+        url: f.url.value.trim(),
+        color: f.color.value,
+        share: f.share.checked
+      });
+      cal.me = r;
+      f.reset();
+      await loadBase();
+      renderSettings();
+      cal.cache.clear();
+      loadEvents(true);
+      toast(`Abonniert – ${r.feed_events || 0} Termine gefunden.`);
+    });
   });
 
   $("#btn-cal-disconnect").addEventListener("click", async () => {
@@ -752,7 +886,7 @@
   });
 
   // ---------- Klicks in der Ansicht ----------
-  $("#view-calendar").addEventListener("click", e => {
+  $("#view-calendar").addEventListener("click", async e => {
     const t = e.target.closest("button");
     if (!t) return;
     if (t.dataset.day) {
@@ -792,6 +926,18 @@
     }
     if (t.id === "cal-settings") { openSettings(); return; }
     if (t.id === "cal-add") { openNewEvent(); return; }
+    if (t.dataset.calTodo) {
+      const td = cal.todos.find(x => x.id === t.dataset.calTodo);
+      if (!td) return;
+      const before = td.is_done;
+      td.is_done = !before;
+      render();
+      const { error } = await sb.from("todos").update({ is_done: !before }).eq("id", td.id);
+      if (error) { td.is_done = before; render(); toast(PP.translateError(error), true); return; }
+      await loadExtras();   // wiederkehrende Aufgaben: nächsten Termin holen
+      render();
+      return;
+    }
   });
 
   $("#sheet-connect").addEventListener("click", e => {

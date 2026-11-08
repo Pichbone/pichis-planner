@@ -289,6 +289,7 @@
         <div class="cal-dayview">
           <h3 id="cal-day-title" class="cal-day-title"></h3>
           <div id="cal-day-list"></div>
+          <div id="cal-day-extra"></div>
         </div>
       </div>
      </div>
@@ -553,6 +554,50 @@
 
     <h3 class="sheet-sub">Kalender der Familie</h3>
     <ul class="cal-list" id="cal-list-others"></ul>
+
+    <div id="cal-feed-block" hidden>
+    <h3 class="sheet-sub">Kalender per Link abonnieren (z. B. Outlook)</h3>
+    <details class="howto small">
+      <summary>So bekommst du den Link aus Outlook</summary>
+      <ol class="steps">
+        <li>Outlook im Browser öffnen (outlook.office.com bzw. outlook.live.com).</li>
+        <li>⚙️ Einstellungen → Kalender → Freigegebene Kalender.</li>
+        <li>Unter „Kalender veröffentlichen“ den Kalender und „Kann alle Details anzeigen“ wählen → Veröffentlichen.</li>
+        <li>Den <b>ICS-Link</b> kopieren und hier einfügen.</li>
+      </ol>
+      <p class="muted">Bei Dienst-Konten kann die Firma das Veröffentlichen gesperrt haben. Outlook aktualisiert den Link mit etwas Verzögerung.</p>
+    </details>
+    <form id="form-feed" class="form feed-form" autocomplete="off">
+      <label>Name
+        <input type="text" name="name" maxlength="60" placeholder="z. B. Outlook Dienst" required>
+      </label>
+      <label>Link (ICS oder webcal)
+        <input type="url" name="url" placeholder="https://outlook.office365.com/…/calendar.ics" required>
+      </label>
+      <div class="form-row form-row-even">
+        <label>Farbe
+          <select name="color">
+            <option value="#0F766E">Petrol</option>
+            <option value="#3B6EA5">Blau</option>
+            <option value="#E0703F">Orange</option>
+            <option value="#7A4FA8">Lila</option>
+            <option value="#B7791F">Senf</option>
+            <option value="#BE185D">Beere</option>
+            <option value="#4B5563">Grau</option>
+          </select>
+        </label>
+        <label class="switch feed-share"><input type="checkbox" name="share" checked><span>Familie sieht ihn</span></label>
+      </div>
+      <button type="submit" class="btn btn-secondary">Abonnieren</button>
+    </form>
+    </div>
+
+    <h3 class="sheet-sub">Anzeige im Kalender</h3>
+    <div class="form">
+      <label class="switch"><input type="checkbox" id="cal-show-todos"><span>✅ Aufgaben im Kalender anzeigen</span></label>
+      <label class="switch"><input type="checkbox" id="cal-show-shop"><span>🛒 Einkaufsliste bei „Heute“ anzeigen</span></label>
+      <p class="muted small">Gilt für dieses Gerät.</p>
+    </div>
 
     <h3 class="sheet-sub">Tags</h3>
     <ul class="cal-list" id="cal-tag-list"></ul>
