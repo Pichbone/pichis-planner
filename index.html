@@ -192,11 +192,11 @@
           <div class="tile-name">Einladungen</div>
           <div class="tile-status">Bald</div>
         </div>
-        <div class="tile">
+        <a class="tile tile-active tile-slate" href="#/mail">
           <div class="tile-icon">📥</div>
           <div class="tile-name">Aufgaben per Mail</div>
-          <div class="tile-status">Bald</div>
-        </div>
+          <div class="tile-status" id="tile-mi-status">Öffnen</div>
+        </a>
       </div>
 
       <h2 class="section-title">Familie</h2>
@@ -245,6 +245,34 @@
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
+     </div>
+
+     <!-- ===== Aufgaben per Mail ===== -->
+     <div id="view-mailin" class="view" hidden>
+      <div class="card mi-card">
+        <span class="field-label">Schick eine Mail an</span>
+        <div class="mi-address" id="mi-address"></div>
+        <p class="muted small">Nur Mails von der Adresse, mit der du dich bei Pichis Planner angemeldet hast, werden angenommen. Verarbeitet wird alle 5 Minuten.</p>
+        <button class="btn btn-secondary" id="btn-mi-run">↻ Jetzt abrufen</button>
+      </div>
+
+      <h2 class="section-title">So geht's</h2>
+      <div class="card mi-help">
+        <p><strong>✅ Aufgabe:</strong> Der <b>Betreff</b> wird zur Aufgabe, der Mailtext zur Notiz, Anhänge werden zu Anlagen. Im Betreff funktioniert die Schnelleingabe:</p>
+        <ul class="mi-examples">
+          <li><code>Zahnarzt anrufen morgen 15 Uhr !</code></li>
+          <li><code>Rechnung bezahlen #Finanzen 15.12.</code></li>
+          <li><code>Müll rausbringen jeden Dienstag @Anna</code></li>
+        </ul>
+        <p>Weiterleiten klappt auch – „WG:“ und „AW:“ werden entfernt.</p>
+        <p><strong>🛒 Einkauf:</strong> Betreff <code>Einkauf: Milch, Brot</code> – jede Zeile im Text wird ein Artikel. <code>Einkauf Drogerie: …</code> wählt die Liste.</p>
+        <p><strong>📝 Notiz:</strong> Betreff <code>Notiz: Idee für den Garten</code> – der Text wird zur Notiz.</p>
+        <p class="muted small">Alternativ über die Adresse (falls dein Anbieter „+“-Adressen unterstützt):</p>
+        <ul class="mi-examples" id="mi-plus"></ul>
+      </div>
+
+      <h2 class="section-title">Zuletzt per Mail angelegt</h2>
+      <ul class="card mi-log" id="mi-log"></ul>
      </div>
 
      <!-- ===== Tagebuch ===== -->
@@ -927,5 +955,6 @@
   <script src="/js/planner.js"></script>
   <script src="/js/notes.js"></script>
   <script src="/js/journal.js"></script>
+  <script src="/js/mailin.js"></script>
 </body>
 </html>

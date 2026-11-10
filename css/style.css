@@ -1112,3 +1112,26 @@ input[type="date"], input[type="time"] {
 }
 .jn-viewer img { max-width: 100%; max-height: 92vh; border-radius: 6px; }
 .jn-viewer-close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 18px; color: #fff; font-size: 1.4rem; }
+
+/* ---------- Aufgaben per Mail ---------- */
+:root { --slate: #4B5D78; --slate-soft: #E3E8F0; }
+@media (prefers-color-scheme: dark) { :root { --slate: #9DB0CF; --slate-soft: #222A36; } }
+.tile-slate { border-color: var(--slate); background: var(--slate-soft); }
+.tile-slate .tile-status { color: var(--slate); }
+
+.mi-card { display: flex; flex-direction: column; gap: 10px; }
+.mi-card .muted { margin: 0; }
+.mi-address { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.mi-addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; font-size: 1rem; overflow-wrap: anywhere; }
+.mi-help p { margin: 0 0 10px; line-height: 1.5; }
+.mi-help code, .mi-examples code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; background: var(--bg); padding: 1px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+.mi-examples { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.mi-log { list-style: none; margin: 0; padding: 6px 16px; }
+.mi-log li { border-bottom: 1px solid var(--line); }
+.mi-log li:last-child { border-bottom: 0; }
+.mi-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; color: var(--ink); text-decoration: none; }
+.mi-icon { font-size: 1.2rem; }
+.mi-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mi-title { font-weight: 600; overflow-wrap: anywhere; }
+.mi-sub { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.mi-log .muted { padding: 10px 0; }

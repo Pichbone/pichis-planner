@@ -186,7 +186,8 @@
     "medien": { id: "media", title: "Neue Medien", module: "media" },
     "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" },
     "notizen": { id: "notes", title: "Notizen", module: "notes" },
-    "tagebuch": { id: "journal", title: "Tagebuch", module: "journal" }
+    "tagebuch": { id: "journal", title: "Tagebuch", module: "journal" },
+    "mail": { id: "mailin", title: "Aufgaben per Mail", module: "mailin" }
   };
   let activeView = null;
 
