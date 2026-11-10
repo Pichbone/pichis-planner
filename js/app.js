@@ -99,7 +99,7 @@
   async function loadProfile() {
     const { data, error } = await sb
       .from("profiles")
-      .select("id, display_name, digest_enabled, digest_time, digest_skip_empty, push_messages, push_tasks")
+      .select("*")
       .eq("id", state.session.user.id)
       .maybeSingle();
     if (error) throw error;

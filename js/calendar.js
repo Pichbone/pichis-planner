@@ -926,6 +926,7 @@
     }
     if (t.id === "cal-settings") { openSettings(); return; }
     if (t.id === "cal-add") { openNewEvent(); return; }
+    if (t.id === "cal-plan") { if (PP.planner) PP.planner.open(cal.selected); return; }
     if (t.dataset.calTodo) {
       const td = cal.todos.find(x => x.id === t.dataset.calTodo);
       if (!td) return;
@@ -946,6 +947,13 @@
   $("#cal-account").addEventListener("click", e => {
     if (e.target.closest("[data-cal-connect]")) openConnect();
   });
+
+  // Nach dem Einplanen: Aufgaben im Kalender neu laden
+  PP.calendarRefreshExtras = async () => {
+    if (!cal.active) return;
+    await loadExtras();
+    render();
+  };
 
   // ---------- Modul-Schnittstelle ----------
   PP.modules.calendar = {

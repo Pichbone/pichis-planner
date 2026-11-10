@@ -218,6 +218,8 @@
         <button class="chip" data-filter="all">Alle</button>
         <button class="chip" data-filter="mine">Für mich</button>
         <button class="chip" data-filter="private">🔒 Privat</button>
+        <span class="spacer"></span>
+        <button class="chip chip-plan" id="btn-todo-plan">✨ Planen</button>
       </div>
 
       <form id="form-add-todo" class="add-bar add-bar-green" autocomplete="off">
@@ -227,6 +229,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </form>
+      <div id="todo-suggest" class="todo-suggest" hidden></div>
       <p class="input-hint">Tipp: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>um 15 Uhr</b>, <b>für 1 Std</b>, <b>@Name</b>, <b>!</b> für wichtig, <b>#privat</b></p>
 
       <div id="todo-items"></div>
@@ -287,7 +290,10 @@
           <p class="muted small cal-loading" id="cal-loading" hidden>Termine werden aus iCloud geladen …</p>
         </div>
         <div class="cal-dayview">
-          <h3 id="cal-day-title" class="cal-day-title"></h3>
+          <div class="cal-day-head">
+            <h3 id="cal-day-title" class="cal-day-title"></h3>
+            <button class="chip chip-plan" id="cal-plan">✨ Planen</button>
+          </div>
           <div id="cal-day-list"></div>
           <div id="cal-day-extra"></div>
         </div>
@@ -486,6 +492,20 @@
     <button type="button" class="link danger-link ev-delete" id="btn-delete-event" hidden>Termin löschen</button>
   </div>
 
+  <!-- Tag planen -->
+  <div id="sheet-plan" class="sheet" hidden role="dialog" aria-label="Tag planen">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>✨ Tag planen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div class="chips" id="plan-days"></div>
+    <p id="plan-source" class="plan-source"></p>
+    <div id="plan-body"></div>
+    <button type="button" class="btn btn-primary btn-block" id="btn-plan-apply" hidden>Übernehmen</button>
+    <button type="button" class="link plan-again" id="btn-plan-again" hidden>↻ Neu planen</button>
+  </div>
+
   <!-- Medium hinzufügen / bearbeiten -->
   <div id="sheet-media" class="sheet" hidden role="dialog" aria-label="Medium">
     <div class="sheet-handle"></div>
@@ -673,6 +693,57 @@
     </div>
 
     <div class="panel-section">
+      <h3>✨ Tag planen</h3>
+      <p class="muted small">Die App verteilt deine Aufgaben ohne Uhrzeit auf freie Zeiten. An die KI gehen nur Aufgaben und freie Zeitfenster – keine Termine.</p>
+      <form id="form-plan" class="form">
+        <label class="switch"><input type="checkbox" name="plan_ai"><span>KI (Claude) verwenden</span></label>
+        <label id="plan-model-row">Modell
+          <select name="plan_model">
+            <option value="haiku">Haiku – schnell und sehr günstig</option>
+            <option value="sonnet">Sonnet – gründlicher, teurer</option>
+          </select>
+        </label>
+        <label class="switch"><input type="checkbox" name="plan_suggest"><span>Beim Anlegen einer Aufgabe eine Zeit vorschlagen</span></label>
+        <div class="form-row form-row-even">
+          <label>Werktags ab
+            <input type="time" name="plan_weekday_start" step="900" required>
+          </label>
+          <label>bis
+            <input type="time" name="plan_weekday_end" step="900" required>
+          </label>
+        </div>
+        <div class="form-row form-row-even">
+          <label>Wochenende ab
+            <input type="time" name="plan_weekend_start" step="900" required>
+          </label>
+          <label>bis
+            <input type="time" name="plan_weekend_end" step="900" required>
+          </label>
+        </div>
+        <div class="form-row form-row-even">
+          <label>Standarddauer
+            <select name="plan_default_minutes">
+              <option value="15">15 Min.</option>
+              <option value="30">30 Min.</option>
+              <option value="45">45 Min.</option>
+              <option value="60">1 Std.</option>
+            </select>
+          </label>
+          <label>Puffer
+            <select name="plan_buffer_minutes">
+              <option value="0">keiner</option>
+              <option value="5">5 Min.</option>
+              <option value="10">10 Min.</option>
+              <option value="15">15 Min.</option>
+              <option value="30">30 Min.</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-secondary">Speichern</button>
+      </form>
+    </div>
+
+    <div class="panel-section">
       <h3>Tägliche Zusammenfassung</h3>
       <p class="muted small">Jeden Tag eine E-Mail mit deinen Terminen, fälligen Aufgaben und der Einkaufsliste – an <span id="digest-email"></span>.</p>
       <form id="form-digest" class="form">
@@ -716,5 +787,6 @@
   <script src="/js/calendar.js"></script>
   <script src="/js/media.js"></script>
   <script src="/js/messages.js"></script>
+  <script src="/js/planner.js"></script>
 </body>
 </html>

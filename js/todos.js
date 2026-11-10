@@ -211,6 +211,7 @@
     upsertLocal(data);
     render();
     if (data.assigned_to && data.assigned_to !== state.session.user.id && PP.notify) PP.notify.task(data.id);
+    if (!data.due_time && PP.planner) PP.planner.suggestFor(data);
 
     const extras = [];
     if (data.due_date) extras.push(dueLabel(data.due_date));
@@ -581,6 +582,7 @@
     if (!t) return;
     if (t.dataset.toggle) { toggle(t.dataset.toggle); return; }
     if (t.dataset.edit) { openEdit(t.dataset.edit); return; }
+    if (t.id === "btn-todo-plan") { if (PP.planner) PP.planner.open(); return; }
     if (t.dataset.filter) {
       td.filter = t.dataset.filter;
       storageSet("pp_todo_filter", td.filter);
