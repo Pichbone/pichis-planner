@@ -1030,3 +1030,85 @@ input[type="date"], input[type="time"] {
 .todo-tags-block { display: flex; flex-direction: column; gap: 8px; }
 .field-label { font-weight: 500; font-size: .95rem; }
 .item-main .tag-row { margin-top: 3px; }
+
+/* ---------- Tagebuch ---------- */
+:root { --rose: #A63D5E; --rose-soft: #F6E1E8; }
+@media (prefers-color-scheme: dark) { :root { --rose: #E58AA6; --rose-soft: #35202A; } }
+.tile-rose { border-color: var(--rose); background: var(--rose-soft); }
+.tile-rose .tile-status { color: var(--rose); }
+
+.jn-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--rose-soft); border: 1px solid var(--rose); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 12px;
+}
+.jn-hero-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jn-lock { font-size: .75rem; font-weight: 600; color: var(--rose); }
+#jn-today { font-family: var(--font-head); font-size: 1.15rem; }
+.jn-hero .btn-primary { background: var(--rose); color: #fff; flex-shrink: 0; }
+
+.mood-card { padding: 14px 16px; margin-bottom: 12px; }
+.mood-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.mood-title { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.mood-avg { font-size: .9rem; font-weight: 600; }
+.mood-chart { display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+.mood-bar { flex: 1; border-radius: 3px 3px 1px 1px; min-width: 3px; }
+.mood-bar.mood-none { height: 4px; background: var(--surface-2); }
+.mood-axis { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); margin-top: 6px; }
+
+.jn-reminder { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; margin-bottom: 12px; }
+.jn-reminder .switch { flex-direction: row; display: flex; align-items: center; gap: 12px; font-weight: 500; cursor: pointer; }
+.jn-reminder-time { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.jn-reminder-time input { width: auto; padding: 7px 10px; min-height: 0; }
+.jn-reminder p { flex-basis: 100%; margin: 0; }
+.jn-search { margin-bottom: 4px; background: var(--surface) !important; }
+
+.jn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.jn-card {
+  width: 100%; display: flex; gap: 14px; align-items: flex-start;
+  font: inherit; text-align: left; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 14px; cursor: pointer;
+}
+.jn-date { display: flex; flex-direction: column; align-items: center; min-width: 38px; padding-top: 2px; }
+.jn-day { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.jn-wd { font-size: .72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+.jn-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.jn-top { display: flex; align-items: center; gap: 8px; }
+.jn-mood { font-size: 1.25rem; line-height: 1; }
+.jn-title { font-weight: 700; overflow-wrap: anywhere; }
+.jn-text { font-size: .9rem; opacity: .85; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.jn-thumbs { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+.jn-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; background: var(--surface-2); }
+.jn-more { font-size: .8rem; font-weight: 600; color: var(--muted); }
+
+.mood-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.mood-btn {
+  font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 12px;
+  padding: 8px 2px; cursor: pointer; color: var(--ink);
+}
+.mood-btn.active { border-color: var(--mood); background: color-mix(in srgb, var(--mood) 14%, var(--surface)); }
+.mood-emoji { font-size: 1.6rem; line-height: 1.1; }
+.mood-label { font-size: .68rem; font-weight: 600; color: var(--muted); text-align: center; line-height: 1.15; }
+.mood-btn.active .mood-label { color: var(--ink); }
+.jn-body { min-height: 160px; line-height: 1.55; }
+
+.jn-images { list-style: none; margin: 12px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+.jn-images:empty { display: none; }
+.jn-images li { position: relative; }
+.jn-img { display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--surface-2); }
+.jn-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.jn-img-del {
+  position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%;
+  border: 0; background: rgba(0, 0, 0, .55); color: #fff; font-size: .75rem; cursor: pointer;
+}
+#btn-jn-img { margin-top: 12px; }
+
+.jn-viewer {
+  position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .92);
+  display: flex; align-items: center; justify-content: center; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+  cursor: zoom-out;
+}
+.jn-viewer img { max-width: 100%; max-height: 92vh; border-radius: 6px; }
+.jn-viewer-close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 18px; color: #fff; font-size: 1.4rem; }

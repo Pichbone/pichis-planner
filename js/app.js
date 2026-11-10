@@ -185,7 +185,8 @@
     "kalender": { id: "calendar", title: "Kalender", module: "calendar" },
     "medien": { id: "media", title: "Neue Medien", module: "media" },
     "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" },
-    "notizen": { id: "notes", title: "Notizen", module: "notes" }
+    "notizen": { id: "notes", title: "Notizen", module: "notes" },
+    "tagebuch": { id: "journal", title: "Tagebuch", module: "journal" }
   };
   let activeView = null;
 

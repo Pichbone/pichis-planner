@@ -182,6 +182,11 @@
           <div class="tile-name">Notizen</div>
           <div class="tile-status" id="tile-note-status">Öffnen</div>
         </a>
+        <a class="tile tile-active tile-rose" href="#/tagebuch">
+          <div class="tile-icon">📔</div>
+          <div class="tile-name">Tagebuch</div>
+          <div class="tile-status" id="tile-jn-status">Nur für dich</div>
+        </a>
         <div class="tile">
           <div class="tile-icon">✉️</div>
           <div class="tile-name">Einladungen</div>
@@ -240,6 +245,31 @@
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
+     </div>
+
+     <!-- ===== Tagebuch ===== -->
+     <div id="view-journal" class="view" hidden>
+      <div class="jn-hero">
+        <div class="jn-hero-text">
+          <span class="jn-lock">🔒 Nur für dich sichtbar</span>
+          <strong id="jn-today">Wie war dein Tag?</strong>
+        </div>
+        <button class="btn btn-primary" id="btn-jn-add">✏️ Schreiben</button>
+      </div>
+
+      <div id="jn-chart"></div>
+
+      <form id="form-jn-reminder" class="card jn-reminder" autocomplete="off">
+        <label class="switch"><input type="checkbox" name="enabled"><span>⏰ Täglich erinnern</span></label>
+        <label id="jn-reminder-time" class="jn-reminder-time" hidden>um
+          <input type="time" name="time" step="900">
+          Uhr
+        </label>
+        <p class="muted small" id="jn-reminder-hint" hidden></p>
+      </form>
+
+      <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
+      <div id="jn-items"></div>
      </div>
 
      <!-- ===== Notizen ===== -->
@@ -519,6 +549,41 @@
 
     <button type="button" class="btn btn-primary btn-block" id="btn-save-event">Speichern</button>
     <button type="button" class="link danger-link ev-delete" id="btn-delete-event" hidden>Termin löschen</button>
+  </div>
+
+  <!-- Tagebuch-Eintrag -->
+  <div id="sheet-jn" class="sheet sheet-tall" hidden role="dialog" aria-label="Tagebuch-Eintrag">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="jn-sheet-title">Neuer Eintrag</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-jn" class="form" autocomplete="off">
+      <span class="field-label">Wie geht es dir?</span>
+      <div class="mood-picker" id="jn-moods"></div>
+      <div class="form-row form-row-even">
+        <label>Datum
+          <input type="date" name="entry_date" required>
+        </label>
+        <label>Titel <span class="hint">(optional)</span>
+          <input type="text" name="title" maxlength="200">
+        </label>
+      </div>
+      <textarea name="body" maxlength="50000" placeholder="Was ist heute passiert? Was hat dich beschäftigt, gefreut, geärgert …" class="jn-body" aria-label="Text"></textarea>
+    </form>
+
+    <ul class="jn-images" id="jn-images"></ul>
+    <button type="button" class="btn btn-small" id="btn-jn-img">📷 Bild hinzufügen</button>
+    <input type="file" id="jn-file" accept="image/*" multiple hidden>
+
+    <button type="submit" form="form-jn" class="btn btn-primary btn-block">Speichern</button>
+    <button type="button" class="link danger-link ev-delete" id="btn-jn-delete" hidden>Eintrag löschen</button>
+  </div>
+
+  <!-- Bild in groß -->
+  <div id="jn-viewer" class="jn-viewer" hidden role="dialog" aria-label="Bild">
+    <img id="jn-viewer-img" alt="">
+    <span class="jn-viewer-close">✕</span>
   </div>
 
   <!-- Notiz -->
@@ -861,5 +926,6 @@
   <script src="/js/messages.js"></script>
   <script src="/js/planner.js"></script>
   <script src="/js/notes.js"></script>
+  <script src="/js/journal.js"></script>
 </body>
 </html>
