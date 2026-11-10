@@ -211,12 +211,13 @@
 
       <form id="form-add-item" class="add-bar" autocomplete="off">
         <input type="text" name="text" list="shop-suggestions" maxlength="300"
-               placeholder="Hinzufügen, z. B. 2 Milch, Brot" enterkeyhint="done" aria-label="Artikel hinzufügen">
+               placeholder="z. B. 2 Milch, Brot #Grillen" enterkeyhint="done" aria-label="Artikel hinzufügen">
         <button type="submit" class="add-btn" aria-label="Hinzufügen">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </form>
       <datalist id="shop-suggestions"></datalist>
+      <div class="chips" id="shop-tags"></div>
 
       <div id="shop-items"></div>
       <div id="shop-done" class="done-section"></div>
@@ -408,6 +409,14 @@
       <label id="item-list-row">Liste
         <select name="list"></select>
       </label>
+      <div class="todo-tags-block">
+        <span class="field-label">Tags</span>
+        <div class="chip-wrap" id="item-edit-tags"></div>
+        <div class="inline-form">
+          <input type="text" name="new_tag" maxlength="40" placeholder="Neuer Tag, z. B. Grillen" aria-label="Neuer Tag" autocomplete="off">
+          <button type="button" class="btn btn-small" id="btn-item-tag-add">Anlegen</button>
+        </div>
+      </div>
       <button type="submit" class="btn btn-primary">Speichern</button>
       <button type="button" class="link danger-link" id="btn-delete-item">Artikel löschen</button>
     </form>

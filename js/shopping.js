@@ -78,8 +78,49 @@
     showDone: false,
     editingItemId: null,
     editingListId: null,
-    active: false
+    active: false,
+    tags: [],
+    tagFilter: storageGet("pp_shop_tag") || "",
+    draftTags: new Set()
   };
+
+  // ---------- Tags ----------
+  const TAG_COLORS = ["#E0703F", "#2F5D50", "#3B6EA5", "#8E5BB5", "#B7791F", "#0F766E", "#BE185D", "#4B5563", "#C2410C"];
+  function normTag(s) { return String(s).toLowerCase().replace(/[^a-z0-9äöüß]/g, ""); }
+
+  async function createTag(name) {
+    const clean = String(name).trim().slice(0, 40);
+    if (!clean) return null;
+    const existing = shop.tags.find(t => t.name.toLowerCase() === clean.toLowerCase());
+    if (existing) return existing;
+    const { data, error } = await sb.from("event_tags").insert({
+      household_id: state.household.id, name: clean, color: TAG_COLORS[shop.tags.length % TAG_COLORS.length]
+    }).select("id, name, color").single();
+    if (error) { toast(translateError(error), true); return null; }
+    shop.tags.push(data);
+    shop.tags.sort((a, b) => a.name.localeCompare(b.name));
+    return data;
+  }
+
+  // "#Grillen" aus der Eingabe herauslösen (gilt für alle Artikel der Eingabe)
+  async function takeTags(text) {
+    const ids = [];
+    let m;
+    const re = /(?:^|\s)#([a-zäöüß0-9][\wäöüß-]*)/i;
+    while ((m = text.match(re))) {
+      text = text.slice(0, m.index) + " " + text.slice(m.index + m[0].length);
+      const q = normTag(m[1]);
+      if (!q) continue;
+      let tag = shop.tags.find(t => normTag(t.name) === q) || shop.tags.find(t => normTag(t.name).startsWith(q));
+      if (!tag) tag = await createTag(m[1].replace(/-/g, " "));
+      if (tag && !ids.includes(tag.id)) ids.push(tag.id);
+    }
+    return { text: text.replace(/\s+/g, " ").trim(), ids };
+  }
+
+  function tagChip(tag) {
+    return `<span class="tag" style="--tag:${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`;
+  }
 
   // ---------- Eingabe verstehen ----------
   const UNIT = "(?:x|×|g|gr|kg|l|ml|cl|stk\\.?|stück|pck\\.?|packung(?:en)?|pkg|dose(?:n)?|flasche(?:n)?|becher|bund|netz|kiste(?:n)?|beutel|glas|gläser|tüte(?:n)?|rolle(?:n)?|kasten|kästen)";
@@ -156,6 +197,9 @@
     shop.lists = lists.data;
     shop.items = items.data;
     shop.history = new Map(history.data.map(h => [h.name_key, h]));
+    const tg = await sb.from("event_tags").select("id, name, color").eq("household_id", hid).order("name");
+    if (!tg.error) shop.tags = tg.data;
+    if (shop.tagFilter && !shop.tags.some(t => t.id === shop.tagFilter)) shop.tagFilter = "";
 
     if (shop.lists.length === 0) {
       const { data, error } = await sb.from("shopping_lists")
@@ -227,9 +271,13 @@
   }
 
   // ---------- Aktionen ----------
-  async function addFromInput(text) {
-    const entries = splitEntries(text);
+  async function addFromInput(rawText) {
+    const parsed = await takeTags(rawText);
+    const tagIds = [...parsed.ids];
+    if (shop.tagFilter && !tagIds.includes(shop.tagFilter)) tagIds.push(shop.tagFilter);
+    const entries = splitEntries(parsed.text);
     if (entries.length === 0) return;
+    const merge = item => [...new Set([...(item.tag_ids || []), ...tagIds])];
 
     const listId = shop.activeListId;
     const inserts = [];
@@ -239,20 +287,21 @@
     for (const e of entries) {
       const existing = shop.items.find(x => x.list_id === listId && x.name.toLowerCase() === e.name.toLowerCase());
       if (existing && !existing.is_done) {
-        if (e.quantity && e.quantity !== existing.quantity) {
-          reactivate.push({ id: existing.id, quantity: e.quantity, is_done: false });
+        if ((e.quantity && e.quantity !== existing.quantity) || merge(existing).length !== (existing.tag_ids || []).length) {
+          reactivate.push({ id: existing.id, quantity: e.quantity || existing.quantity, is_done: false, tag_ids: merge(existing) });
         } else {
           skipped++;
         }
       } else if (existing && existing.is_done) {
-        reactivate.push({ id: existing.id, quantity: e.quantity || existing.quantity, is_done: false });
+        reactivate.push({ id: existing.id, quantity: e.quantity || existing.quantity, is_done: false, tag_ids: merge(existing) });
       } else {
         inserts.push({
           list_id: listId,
           household_id: state.household.id,
           name: e.name,
           quantity: e.quantity,
-          category: guessCategory(e.name)
+          category: guessCategory(e.name),
+          ...(tagIds.length ? { tag_ids: tagIds } : {})
         });
       }
     }
@@ -263,8 +312,10 @@
       data.forEach(row => upsertLocal(shop.items, row));
     }
     for (const r of reactivate) {
+      const upd = { quantity: r.quantity, is_done: false };
+      if (tagIds.length) upd.tag_ids = r.tag_ids;
       const { data, error } = await sb.from("shopping_items")
-        .update({ quantity: r.quantity, is_done: false }).eq("id", r.id).select().single();
+        .update(upd).eq("id", r.id).select().single();
       if (error) throw error;
       upsertLocal(shop.items, data);
     }
@@ -331,6 +382,7 @@
   function itemRow(item) {
     const meta = [];
     if (item.note) meta.push(escapeHtml(item.note));
+    const tags = (item.tag_ids || []).map(id => shop.tags.find(t => t.id === id)).filter(Boolean);
     if (item.created_by && item.created_by !== state.session.user.id) {
       const n = memberName(item.created_by);
       if (n) meta.push("von " + escapeHtml(n));
@@ -342,12 +394,20 @@
       <button class="item-main" data-edit="${item.id}">
         <span class="item-name">${item.quantity ? `<span class="qty">${escapeHtml(item.quantity)}</span>` : ""}${escapeHtml(item.name)}</span>
         ${meta.length ? `<span class="item-meta">${meta.join(" · ")}</span>` : ""}
+        ${tags.length ? `<span class="tag-row">${tags.map(tagChip).join("")}</span>` : ""}
       </button>
     </li>`;
   }
 
   function renderItems() {
-    const listItems = shop.items.filter(x => x.list_id === shop.activeListId);
+    const onList = shop.items.filter(x => x.list_id === shop.activeListId);
+    const used = new Set(onList.flatMap(x => x.tag_ids || []));
+    const shown = shop.tags.filter(t => used.has(t.id) || t.id === shop.tagFilter);
+    $("#shop-tags").innerHTML = shown.length
+      ? `<button class="chip${shop.tagFilter ? "" : " active"}" data-shop-tag="">Alle</button>` +
+        shown.map(t => `<button class="chip chip-tag${shop.tagFilter === t.id ? " active" : ""}" data-shop-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)}</button>`).join("")
+      : "";
+    const listItems = shop.tagFilter ? onList.filter(x => (x.tag_ids || []).includes(shop.tagFilter)) : onList;
     const open = listItems.filter(x => !x.is_done);
     const done = listItems.filter(x => x.is_done)
       .sort((a, b) => String(b.done_at || "").localeCompare(String(a.done_at || "")));
@@ -415,6 +475,9 @@
       .map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join("");
     f.list.value = item.list_id;
     $("#item-list-row").hidden = shop.lists.length < 2;
+    shop.draftTags = new Set(item.tag_ids || []);
+    f.new_tag.value = "";
+    renderTagPicker();
     openSheet("sheet-item");
   }
 
@@ -422,19 +485,49 @@
     e.preventDefault();
     const f = e.target;
     PP.withBusy(f, async () => {
-      const { data, error } = await sb.from("shopping_items").update({
+      const upd = {
         name: f.name.value.trim(),
         quantity: f.quantity.value.trim(),
         note: f.note.value.trim(),
         category: f.category.value,
         list_id: f.list.value
-      }).eq("id", shop.editingItemId).select().single();
+      };
+      const before = shop.items.find(x => x.id === shop.editingItemId);
+      const tagIds = [...shop.draftTags].filter(id => shop.tags.some(t => t.id === id));
+      if (tagIds.length || (before && before.tag_ids && before.tag_ids.length)) upd.tag_ids = tagIds;
+      const { data, error } = await sb.from("shopping_items").update(upd).eq("id", shop.editingItemId).select().single();
+      if (error && /tag_ids/.test(error.message || "")) throw new Error("Bitte zuerst das SQL aus Schritt 15 in Supabase ausführen.");
       if (error) throw error;
       upsertLocal(shop.items, data);
       shop.history.set(data.name.toLowerCase(), { name: data.name, name_key: data.name.toLowerCase(), category: data.category });
       closeSheets();
       render();
     });
+  });
+
+  function renderTagPicker() {
+    $("#item-edit-tags").innerHTML = shop.tags.length
+      ? shop.tags.map(t => `<button type="button" class="chip chip-tag${shop.draftTags.has(t.id) ? " active" : ""}" data-pick-shop-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)}</button>`).join("")
+      : `<span class="muted small">Noch keine Tags – unten einen anlegen.</span>`;
+  }
+  $("#item-edit-tags").addEventListener("click", e => {
+    const b = e.target.closest("[data-pick-shop-tag]");
+    if (!b) return;
+    const id = b.dataset.pickShopTag;
+    shop.draftTags.has(id) ? shop.draftTags.delete(id) : shop.draftTags.add(id);
+    renderTagPicker();
+  });
+  async function addTagFromField() {
+    const input = $("#form-item").new_tag;
+    const tag = await createTag(input.value);
+    if (!tag) return;
+    shop.draftTags.add(tag.id);
+    input.value = "";
+    renderTagPicker();
+  }
+  $("#btn-item-tag-add").addEventListener("click", addTagFromField);
+  $("#form-item").new_tag.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); addTagFromField(); }
   });
 
   $("#btn-delete-item").addEventListener("click", async () => {
@@ -513,6 +606,12 @@
       return;
     }
     if (t.hasAttribute("data-new-list")) { openListSheet(null); return; }
+    if (t.dataset.shopTag !== undefined) {
+      shop.tagFilter = t.dataset.shopTag;
+      storageSet("pp_shop_tag", shop.tagFilter);
+      renderItems();
+      return;
+    }
     if (t.hasAttribute("data-toggle-done")) { shop.showDone = !shop.showDone; renderItems(); return; }
     if (t.hasAttribute("data-clear-done")) { clearDone(); return; }
   });

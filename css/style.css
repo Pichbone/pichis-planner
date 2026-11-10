@@ -1135,3 +1135,7 @@ input[type="date"], input[type="time"] {
 .mi-title { font-weight: 600; overflow-wrap: anywhere; }
 .mi-sub { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
 .mi-log .muted { padding: 10px 0; }
+
+/* ---------- Tags in der Einkaufsliste ---------- */
+#shop-tags:empty { display: none; }
+#shop-tags { padding-top: 0; }
