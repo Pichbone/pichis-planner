@@ -16,6 +16,9 @@
     householdId: null,
     items: [],
     filter: storageGet("pp_todo_filter") || "all",
+    tags: [],
+    tagFilter: storageGet("pp_todo_tag") || "",
+    draftTags: new Set(),
     channel: null,
     showDone: false,
     editingId: null,
@@ -50,9 +53,11 @@
   const B = "(?:^|\\s)";        // Wortanfang
   const E = "(?=$|[\\s.,!?])";  // Wortende
 
-  function parseTodo(raw, members) {
+  function normTag(s) { return String(s).toLowerCase().replace(/[^a-z0-9äöüß]/g, ""); }
+
+  function parseTodo(raw, members, tags = []) {
     let text = " " + raw.trim().replace(/\s+/g, " ") + " ";
-    const out = { title: "", due_date: null, due_time: null, duration_minutes: null, priority: 0, repeat: "none", is_private: false, assigned_to: null };
+    const out = { title: "", due_date: null, due_time: null, duration_minutes: null, priority: 0, repeat: "none", is_private: false, assigned_to: null, tag_ids: [], new_tags: [] };
     const today = startOfToday();
 
     function take(re) {
@@ -62,6 +67,16 @@
     }
 
     if (take(new RegExp(B + "#privat" + E, "i"))) out.is_private = true;
+
+    // Tags: "#DJ", "#Aareal" (Anfang des Namens reicht), unbekannte werden neu angelegt
+    let hm;
+    while ((hm = take(/(?:^|\s)#([a-zäöüß0-9][\wäöüß-]*)/i))) {
+      const q = normTag(hm[1]);
+      if (!q) continue;
+      const tag = tags.find(t => normTag(t.name) === q) || tags.find(t => normTag(t.name).startsWith(q));
+      if (tag) { if (!out.tag_ids.includes(tag.id)) out.tag_ids.push(tag.id); }
+      else if (!out.new_tags.some(n => normTag(n) === q)) out.new_tags.push(hm[1].replace(/-/g, " "));
+    }
     if (take(/(?:^|\s)!+(?=\s|$)/) || take(/!+\s*$/)) out.priority = 1;
 
     const at = take(/(?:^|\s)@([a-zäöüß][\wäöüß-]*)/i);
@@ -144,6 +159,9 @@
       .order("created_at", { ascending: true });
     if (error) throw error;
     td.items = data;
+    const tg = await sb.from("event_tags").select("id, name, color").eq("household_id", state.household.id).order("name");
+    if (!tg.error) td.tags = tg.data;
+    if (td.tagFilter && !td.tags.some(t => t.id === td.tagFilter)) td.tagFilter = "";
     await loadFiles();
   }
 
@@ -196,8 +214,17 @@
 
   // ---------- Aktionen ----------
   async function addFromInput(text) {
-    const p = parseTodo(text, state.members);
+    const p = parseTodo(text, state.members, td.tags);
     if (!p.title) { toast("Bitte einen Text für die Aufgabe eingeben.", true); return false; }
+
+    // Neue Tags anlegen
+    for (const name of p.new_tags) {
+      const tag = await createTag(name);
+      if (tag) p.tag_ids.push(tag.id);
+    }
+    delete p.new_tags;
+    if (td.tagFilter && !p.tag_ids.includes(td.tagFilter)) p.tag_ids.push(td.tagFilter);
+    if (!p.tag_ids.length) delete p.tag_ids;   // funktioniert auch vor Schritt 12
 
     // Im Filter "Privat" neue Aufgaben automatisch privat anlegen
     if (td.filter === "private") p.is_private = true;
@@ -218,6 +245,7 @@
     if (data.assigned_to) extras.push("für " + memberName(data.assigned_to));
     if (data.repeat !== "none") extras.push(REPEAT_LABEL[data.repeat]);
     if (data.is_private) extras.push("privat");
+    if (data.tag_ids && data.tag_ids.length) extras.push(data.tag_ids.map(id => (td.tags.find(t => t.id === id) || {}).name).filter(Boolean).map(n => "#" + n).join(" "));
     if (extras.length) toast("Aufgabe angelegt: " + extras.join(", "));
     return true;
   }
@@ -260,9 +288,30 @@
   // ---------- Darstellung ----------
   function visible() {
     const me = state.session.user.id;
-    if (td.filter === "mine") return td.items.filter(x => x.assigned_to === me || (x.is_private && x.created_by === me));
-    if (td.filter === "private") return td.items.filter(x => x.is_private);
-    return td.items;
+    let list = td.items;
+    if (td.filter === "mine") list = list.filter(x => x.assigned_to === me || (x.is_private && x.created_by === me));
+    if (td.filter === "private") list = list.filter(x => x.is_private);
+    if (td.tagFilter) list = list.filter(x => (x.tag_ids || []).includes(td.tagFilter));
+    return list;
+  }
+
+  function tagChip(tag) {
+    return `<span class="tag" style="--tag:${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`;
+  }
+
+  async function createTag(name) {
+    const clean = String(name).trim().slice(0, 40);
+    if (!clean) return null;
+    const existing = td.tags.find(t => t.name.toLowerCase() === clean.toLowerCase());
+    if (existing) return existing;
+    const colors = ["#E0703F", "#2F5D50", "#3B6EA5", "#8E5BB5", "#B7791F", "#0F766E", "#BE185D", "#4B5563", "#C2410C"];
+    const { data, error } = await sb.from("event_tags").insert({
+      household_id: state.household.id, name: clean, color: colors[td.tags.length % colors.length]
+    }).select("id, name, color").single();
+    if (error) { toast(translateError(error), true); return null; }
+    td.tags.push(data);
+    td.tags.sort((a, b) => a.name.localeCompare(b.name));
+    return data;
   }
 
   function sortOpen(a, b) {
@@ -307,6 +356,7 @@
     if (item.repeat !== "none") meta.push("🔁 " + REPEAT_LABEL[item.repeat]);
     if (item.is_private) meta.push("🔒 privat");
     if (item.notes) meta.push(escapeHtml(item.notes.split("\n")[0]).slice(0, 80));
+    const tags = (item.tag_ids || []).map(id => td.tags.find(t => t.id === id)).filter(Boolean);
 
     let who = "";
     if (item.assigned_to) {
@@ -321,6 +371,7 @@
       <button class="item-main" data-edit="${item.id}">
         <span class="item-name">${item.priority ? '<span class="prio">!</span>' : ""}${escapeHtml(item.title)}</span>
         ${meta.length ? `<span class="item-meta">${meta.join(" · ")}</span>` : ""}
+        ${tags.length ? `<span class="tag-row">${tags.map(tagChip).join("")}</span>` : ""}
       </button>
       ${who ? `<span class="item-side">${who}</span>` : ""}
     </li>`;
@@ -333,6 +384,13 @@
     document.querySelectorAll("#todo-filters .chip").forEach(c => {
       c.classList.toggle("active", c.dataset.filter === td.filter);
     });
+
+    const used = new Set(td.items.flatMap(x => x.tag_ids || []));
+    const shown = td.tags.filter(t => used.has(t.id) || t.id === td.tagFilter);
+    $("#todo-tags").innerHTML = shown.length
+      ? `<button class="chip${td.tagFilter ? "" : " active"}" data-todo-tag="">Alle Tags</button>` +
+        shown.map(t => `<button class="chip chip-tag${td.tagFilter === t.id ? " active" : ""}" data-todo-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)}</button>`).join("")
+      : "";
 
     const items = visible();
     const open = items.filter(x => !x.is_done).sort(sortOpen);
@@ -384,6 +442,9 @@
     f.repeat.value = item.repeat;
     f.priority.checked = item.priority === 1;
     f.is_private.checked = item.is_private;
+    td.draftTags = new Set(item.tag_ids || []);
+    f.new_tag.value = "";
+    renderTagPicker();
     // Privat umschalten darf nur, wer die Aufgabe angelegt hat
     f.is_private.disabled = item.created_by !== me;
     $("#todo-created").textContent = item.created_by && item.created_by !== me
@@ -407,6 +468,9 @@
         repeat: f.repeat.value,
         priority: f.priority.checked ? 1 : 0
       };
+      const tagIds = [...td.draftTags].filter(id => td.tags.some(t => t.id === id));
+      const before0 = td.items.find(x => x.id === td.editingId);
+      if (tagIds.length || (before0 && before0.tag_ids && before0.tag_ids.length)) payload.tag_ids = tagIds;
       if (!f.is_private.disabled) payload.is_private = f.is_private.checked;
       if (payload.repeat !== "none" && !payload.due_date) payload.due_date = isoDate(startOfToday());
       if (payload.due_time && !payload.due_date) payload.due_date = isoDate(startOfToday());
@@ -422,6 +486,33 @@
       closeSheets();
       render();
     });
+  });
+
+  function renderTagPicker() {
+    $("#todo-edit-tags").innerHTML = td.tags.length
+      ? td.tags.map(t => `<button type="button" class="chip chip-tag${td.draftTags.has(t.id) ? " active" : ""}" data-pick-todo-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)}</button>`).join("")
+      : `<span class="muted small">Noch keine Tags – unten einen anlegen.</span>`;
+  }
+
+  $("#todo-edit-tags").addEventListener("click", e => {
+    const b = e.target.closest("[data-pick-todo-tag]");
+    if (!b) return;
+    const id = b.dataset.pickTodoTag;
+    td.draftTags.has(id) ? td.draftTags.delete(id) : td.draftTags.add(id);
+    renderTagPicker();
+  });
+
+  async function addTagFromField() {
+    const input = $("#form-todo").new_tag;
+    const tag = await createTag(input.value);
+    if (!tag) return;
+    td.draftTags.add(tag.id);
+    input.value = "";
+    renderTagPicker();
+  }
+  $("#btn-todo-tag-add").addEventListener("click", addTagFromField);
+  $("#form-todo").new_tag.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); addTagFromField(); }
   });
 
   $("#btn-delete-todo").addEventListener("click", async () => {
@@ -583,6 +674,12 @@
     if (t.dataset.toggle) { toggle(t.dataset.toggle); return; }
     if (t.dataset.edit) { openEdit(t.dataset.edit); return; }
     if (t.id === "btn-todo-plan") { if (PP.planner) PP.planner.open(); return; }
+    if (t.dataset.todoTag !== undefined) {
+      td.tagFilter = t.dataset.todoTag;
+      storageSet("pp_todo_tag", td.tagFilter);
+      render();
+      return;
+    }
     if (t.dataset.filter) {
       td.filter = t.dataset.filter;
       storageSet("pp_todo_filter", td.filter);

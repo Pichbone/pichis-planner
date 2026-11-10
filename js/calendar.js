@@ -107,7 +107,7 @@
     const jobs = [];
     if (cal.showTodos) {
       jobs.push(sb.from("todos")
-        .select("id, title, due_date, due_time, duration_minutes, is_done, priority, assigned_to, is_private")
+        .select("*")
         .eq("household_id", hid)
         .or(`and(due_date.gte.${isoDate(start)},due_date.lt.${isoDate(end)}),and(due_date.lt.${today},is_done.eq.false)`)
         .then(r => { cal.todos = r.error ? [] : r.data; }));
@@ -366,6 +366,7 @@
             <a class="cal-todo-main" href="#/aufgaben">
               <span class="event-title">${t.priority ? '<span class="prio">!</span>' : ""}${escapeHtml(t.title)}</span>
               <span class="event-sub">${overdue ? `<span class="due-overdue">überfällig seit ${escapeHtml(longDate(t.due_date))}</span>` : (when || "Ganztägig")}${t.is_private ? " · 🔒" : ""}</span>
+              ${(t.tag_ids || []).length ? `<span class="tag-row">${t.tag_ids.map(id => cal.tags.find(x => x.id === id)).filter(Boolean).map(x => tagChip(x)).join("")}</span>` : ""}
             </a>
             ${who}
           </li>`;

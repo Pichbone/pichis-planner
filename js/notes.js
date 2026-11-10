@@ -318,7 +318,8 @@
         notes: notesText,
         due_date: row.note_date,
         due_time: row.note_time,
-        is_private: !!(row.is_private ?? false)
+        is_private: !!(row.is_private ?? false),
+        ...(row.tag_ids.length ? { tag_ids: row.tag_ids } : {})
       }).select().single();
       if (error) throw error;
       closeSheets();

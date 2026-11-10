@@ -234,8 +234,9 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </form>
+      <div class="chips" id="todo-tags"></div>
       <div id="todo-suggest" class="todo-suggest" hidden></div>
-      <p class="input-hint">Tipp: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>um 15 Uhr</b>, <b>für 1 Std</b>, <b>@Name</b>, <b>!</b> für wichtig, <b>#privat</b></p>
+      <p class="input-hint">Tipp: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>um 15 Uhr</b>, <b>für 1 Std</b>, <b>@Name</b>, <b>#Tag</b>, <b>!</b> für wichtig, <b>#privat</b></p>
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
@@ -405,6 +406,14 @@
       <label>Notiz
         <textarea name="notes" rows="3" maxlength="2000"></textarea>
       </label>
+      <div class="todo-tags-block">
+        <span class="field-label">Tags</span>
+        <div class="chip-wrap" id="todo-edit-tags"></div>
+        <div class="inline-form">
+          <input type="text" name="new_tag" maxlength="40" placeholder="Neuer Tag, z. B. DJ" aria-label="Neuer Tag" autocomplete="off">
+          <button type="button" class="btn btn-small" id="btn-todo-tag-add">Anlegen</button>
+        </div>
+      </div>
       <div class="switches">
         <label class="switch"><input type="checkbox" name="priority"><span>❗ Wichtig</span></label>
         <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
