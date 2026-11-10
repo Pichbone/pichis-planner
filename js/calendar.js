@@ -27,6 +27,8 @@
     tagFilter: storageGet("pp_cal_tag") || "",
     showTodos: storageGet("pp_cal_todos") === "1",
     showShopping: storageGet("pp_cal_shop") === "1",
+    showNotes: storageGet("pp_cal_notes") !== "0",
+    notes: [],
     todos: [],
     shopping: [],
     loading: false,
@@ -111,6 +113,15 @@
         .then(r => { cal.todos = r.error ? [] : r.data; }));
     } else {
       cal.todos = [];
+    }
+    if (cal.showNotes) {
+      jobs.push(sb.from("notes")
+        .select("id, title, body, note_date, note_time, tag_ids, is_private, is_pinned, created_by")
+        .eq("household_id", hid)
+        .gte("note_date", isoDate(start)).lt("note_date", isoDate(end))
+        .then(r => { cal.notes = r.error ? [] : r.data; }));
+    } else {
+      cal.notes = [];
     }
     if (cal.showShopping) {
       jobs.push(Promise.all([
@@ -306,7 +317,8 @@
       if (iso === today) cls.push("today");
       if (iso === cal.selected) cls.push("selected");
       const dots = list.slice(0, 4).map(ev => `<i style="background:${escapeHtml(ev.calendar_color)}"></i>`).join("") +
-        (cal.showTodos && cal.todos.some(t => t.due_date === iso && !t.is_done) ? '<i class="todo-dot"></i>' : "");
+        (cal.showTodos && cal.todos.some(t => t.due_date === iso && !t.is_done) ? '<i class="todo-dot"></i>' : "") +
+        (cal.showNotes && cal.notes.some(n => n.note_date === iso) ? '<i class="note-dot"></i>' : "");
       grid += `<button class="${cls.join(" ")}" data-day="${iso}" aria-label="${longDate(iso)}, ${list.length} Termine">
         <span class="num">${d.getDate()}</span><span class="dots">${dots}${list.length > 4 ? "<b>+</b>" : ""}</span>
       </button>`;
@@ -357,6 +369,27 @@
             </a>
             ${who}
           </li>`;
+        }).join("")}</ul>`;
+      }
+    }
+
+    // Notizen des Tages
+    if (cal.showNotes) {
+      const ns = cal.notes.filter(n => n.note_date === cal.selected)
+        .sort((a, b) => String(a.note_time || "").localeCompare(String(b.note_time || "")));
+      if (ns.length) {
+        extra += `<h4 class="cal-sub">📝 Notizen</h4><ul class="events">${ns.map(n => {
+          const tags = n.tag_ids.map(id => cal.tags.find(t => t.id === id)).filter(Boolean);
+          const text = n.title || n.body.split("\n")[0];
+          const sub = n.title && n.body ? n.body.replace(/\s+/g, " ").slice(0, 120) : "";
+          return `<li><button class="cal-note" data-cal-note="${n.id}">
+            <span class="event-time">${n.note_time ? String(n.note_time).slice(0, 5) : "📝"}</span>
+            <span class="event-body">
+              <span class="event-title">${escapeHtml(text)}${n.is_private ? ' <span class="muted">🔒</span>' : ""}</span>
+              ${sub ? `<span class="event-sub">${escapeHtml(sub)}</span>` : ""}
+              ${tags.length ? `<span class="tag-row">${tags.map(t => tagChip(t)).join("")}</span>` : ""}
+            </span>
+          </button></li>`;
         }).join("")}</ul>`;
       }
     }
@@ -778,6 +811,7 @@
 
     $("#cal-show-todos").checked = cal.showTodos;
     $("#cal-show-shop").checked = cal.showShopping;
+    $("#cal-show-notes").checked = cal.showNotes;
 
     $("#cal-tag-list").innerHTML = cal.tags.length
       ? cal.tags.map(t => `<li class="cal-row">${tagChip(t)}<button class="icon-btn small" data-del-tag="${t.id}" aria-label="Tag löschen">✕</button></li>`).join("")
@@ -786,11 +820,13 @@
 
   $("#sheet-calsettings").addEventListener("change", async e => {
     const t = e.target;
-    if (t.id === "cal-show-todos" || t.id === "cal-show-shop") {
+    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes") {
       cal.showTodos = $("#cal-show-todos").checked;
       cal.showShopping = $("#cal-show-shop").checked;
+      cal.showNotes = $("#cal-show-notes").checked;
       storageSet("pp_cal_todos", cal.showTodos ? "1" : "0");
       storageSet("pp_cal_shop", cal.showShopping ? "1" : "0");
+      storageSet("pp_cal_notes", cal.showNotes ? "1" : "0");
       await loadExtras();
       render();
       return;
@@ -927,6 +963,8 @@
     if (t.id === "cal-settings") { openSettings(); return; }
     if (t.id === "cal-add") { openNewEvent(); return; }
     if (t.id === "cal-plan") { if (PP.planner) PP.planner.open(cal.selected); return; }
+    if (t.id === "cal-note-add") { if (PP.notes) PP.notes.create({ date: cal.selected }); return; }
+    if (t.dataset.calNote) { if (PP.notes) PP.notes.open(t.dataset.calNote); return; }
     if (t.dataset.calTodo) {
       const td = cal.todos.find(x => x.id === t.dataset.calTodo);
       if (!td) return;

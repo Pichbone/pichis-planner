@@ -184,7 +184,8 @@
     "aufgaben": { id: "todos", title: "Aufgaben", module: "todos" },
     "kalender": { id: "calendar", title: "Kalender", module: "calendar" },
     "medien": { id: "media", title: "Neue Medien", module: "media" },
-    "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" }
+    "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" },
+    "notizen": { id: "notes", title: "Notizen", module: "notes" }
   };
   let activeView = null;
 

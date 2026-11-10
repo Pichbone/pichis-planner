@@ -177,6 +177,11 @@
           <div class="tile-name">Neue Medien</div>
           <div class="tile-status" id="tile-media-status">Öffnen</div>
         </a>
+        <a class="tile tile-active tile-amber" href="#/notizen">
+          <div class="tile-icon">📝</div>
+          <div class="tile-name">Notizen</div>
+          <div class="tile-status" id="tile-note-status">Öffnen</div>
+        </a>
         <div class="tile">
           <div class="tile-icon">✉️</div>
           <div class="tile-name">Einladungen</div>
@@ -236,6 +241,18 @@
       <div id="todo-done" class="done-section"></div>
      </div>
 
+     <!-- ===== Notizen ===== -->
+     <div id="view-notes" class="view" hidden>
+      <div class="note-toolbar">
+        <input type="search" id="note-search" placeholder="Notizen durchsuchen" aria-label="Notizen durchsuchen" autocomplete="off">
+        <button class="icon-btn icon-btn-accent" id="btn-note-add" aria-label="Neue Notiz">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="chips" id="note-tags"></div>
+      <div id="note-items"></div>
+     </div>
+
      <!-- ===== Nachrichten ===== -->
      <div id="view-messages" class="view" hidden>
       <div class="chips" id="msg-threads"></div>
@@ -292,7 +309,10 @@
         <div class="cal-dayview">
           <div class="cal-day-head">
             <h3 id="cal-day-title" class="cal-day-title"></h3>
-            <button class="chip chip-plan" id="cal-plan">✨ Planen</button>
+            <span class="cal-day-actions">
+              <button class="chip" id="cal-note-add" aria-label="Notiz für diesen Tag">📝 Notiz</button>
+              <button class="chip chip-plan" id="cal-plan">✨ Planen</button>
+            </span>
           </div>
           <div id="cal-day-list"></div>
           <div id="cal-day-extra"></div>
@@ -492,6 +512,48 @@
     <button type="button" class="link danger-link ev-delete" id="btn-delete-event" hidden>Termin löschen</button>
   </div>
 
+  <!-- Notiz -->
+  <div id="sheet-note" class="sheet sheet-tall" hidden role="dialog" aria-label="Notiz">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="note-sheet-title">Notiz</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-note" class="form" autocomplete="off">
+      <input type="text" name="title" maxlength="200" placeholder="Titel" class="note-title-input" aria-label="Titel">
+      <textarea name="body" maxlength="20000" placeholder="Notiz …" class="note-body-input" aria-label="Text"></textarea>
+
+      <label class="switch"><input type="checkbox" name="has_date"><span>📅 Mit Datum – erscheint im Kalender</span></label>
+      <div class="form-row form-row-even" id="note-date-row" hidden>
+        <label>Datum
+          <input type="date" name="note_date">
+        </label>
+        <label>Uhrzeit <span class="hint">(optional)</span>
+          <input type="time" name="note_time" step="300">
+        </label>
+      </div>
+
+      <div class="switches">
+        <label class="switch"><input type="checkbox" name="is_pinned"><span>📌 Oben anheften</span></label>
+        <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      </div>
+    </form>
+
+    <h3 class="sheet-sub">Tags</h3>
+    <div class="chip-wrap" id="note-edit-tags"></div>
+    <form id="form-note-tag" class="inline-form" autocomplete="off">
+      <input type="text" name="name" maxlength="40" placeholder="Neuer Tag, z. B. DJ" aria-label="Neuer Tag">
+      <button type="submit" class="btn btn-small">Anlegen</button>
+    </form>
+
+    <p class="muted small" id="note-info"></p>
+    <button type="submit" form="form-note" class="btn btn-primary btn-block">Speichern</button>
+    <div class="note-actions">
+      <button type="button" class="link" id="btn-note-todo">✅ Als Aufgabe anlegen</button>
+      <button type="button" class="link danger-link" id="btn-note-delete" hidden>Löschen</button>
+    </div>
+  </div>
+
   <!-- Tag planen -->
   <div id="sheet-plan" class="sheet" hidden role="dialog" aria-label="Tag planen">
     <div class="sheet-handle"></div>
@@ -616,6 +678,7 @@
     <div class="form">
       <label class="switch"><input type="checkbox" id="cal-show-todos"><span>✅ Aufgaben im Kalender anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-shop"><span>🛒 Einkaufsliste bei „Heute“ anzeigen</span></label>
+      <label class="switch"><input type="checkbox" id="cal-show-notes"><span>📝 Notizen mit Datum anzeigen</span></label>
       <p class="muted small">Gilt für dieses Gerät.</p>
     </div>
 
@@ -788,5 +851,6 @@
   <script src="/js/media.js"></script>
   <script src="/js/messages.js"></script>
   <script src="/js/planner.js"></script>
+  <script src="/js/notes.js"></script>
 </body>
 </html>
