@@ -1139,3 +1139,14 @@ input[type="date"], input[type="time"] {
 /* ---------- Tags in der Einkaufsliste ---------- */
 #shop-tags:empty { display: none; }
 #shop-tags { padding-top: 0; }
+
+/* ---------- Siri & Erinnerungen ---------- */
+.siri-token, .siri-url {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  background: var(--bg); border-radius: 12px; padding: 10px 12px;
+}
+.siri-token code, .siri-url code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; overflow-wrap: anywhere; min-width: 0; flex: 1; }
+.siri-warn { color: var(--orange); font-weight: 600; margin: 6px 0 0; }
+.mi-card .btn-row { align-items: center; }
+.mi-card .howto .steps li { margin-bottom: 8px; }
+.mi-card .howto code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); padding: 0 5px; border-radius: 4px; }

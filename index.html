@@ -194,7 +194,7 @@
         </div>
         <a class="tile tile-active tile-slate" href="#/mail">
           <div class="tile-icon">📥</div>
-          <div class="tile-name">Aufgaben per Mail</div>
+          <div class="tile-name">Eingang</div>
           <div class="tile-status" id="tile-mi-status">Öffnen</div>
         </a>
       </div>
@@ -272,7 +272,43 @@
         <ul class="mi-examples" id="mi-plus"></ul>
       </div>
 
-      <h2 class="section-title">Zuletzt per Mail angelegt</h2>
+      <h2 class="section-title">🎙️ Siri &amp; Erinnerungen</h2>
+      <div class="card mi-card">
+        <p class="small">Alles, was du per Siri oder von Hand in die Erinnerungsliste <b>„Eingang“</b> schreibst, holt ein Kurzbefehl auf dem iPhone automatisch in Pichis Planner – danach wird die Erinnerung gelöscht.</p>
+        <ul class="mi-examples small">
+          <li>„Hey Siri, erinnere mich morgen um 10 an den Zahnarzt“ → Aufgabe mit Termin</li>
+          <li>„Hey Siri, erinnere mich, Milch und Eier zu kaufen“ → Einkaufsliste</li>
+          <li>„Hey Siri, füge <i>Notiz: Idee Gartenhaus</i> zu Eingang hinzu“ → Notiz</li>
+        </ul>
+        <span class="field-label">1. Dein Zugangsschlüssel</span>
+        <div id="siri-token-box"></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-small" id="btn-siri-token">Schlüssel erzeugen</button>
+          <button class="link danger-link" id="btn-siri-revoke" hidden>Schlüssel löschen</button>
+        </div>
+        <span class="field-label">2. Adresse für den Kurzbefehl</span>
+        <div class="siri-url" id="siri-url"></div>
+        <details class="howto">
+          <summary>3. Kurzbefehl einrichten (einmalig, ca. 5 Minuten)</summary>
+          <ol class="steps small">
+            <li><b>Erinnerungen-App:</b> Liste „Eingang“ anlegen. Dann <i>Einstellungen → Apps → Erinnerungen → Standardliste</i> auf „Eingang“ stellen – so landet alles, was du Siri sagst, dort.</li>
+            <li><b>Kurzbefehle-App → +</b> neuer Kurzbefehl, Name: <b>Eingang abgleichen</b>.</li>
+            <li>Aktion <b>„Erinnerungen suchen“</b>: Filter <i>Liste ist Eingang</i> und <i>Ist abgeschlossen ist nicht</i> (bzw. „nicht erledigt“).</li>
+            <li>Aktion <b>„Wiederholen mit jedem Objekt“</b> in den gefundenen Erinnerungen.</li>
+            <li>Darin <b>„Inhalte von URL abrufen“</b>: URL = Adresse aus Schritt 2. Auf „Mehr anzeigen“ tippen: <i>Methode POST</i>, unter <i>Header</i> einen Eintrag <code>x-pp-token</code> mit deinem Schlüssel, <i>Hauptteil der Anforderung: JSON</i> mit vier Textfeldern:
+              <code>title</code> = Wiederholungsobjekt → <i>Titel</i>,
+              <code>notes</code> = Wiederholungsobjekt → <i>Notizen</i>,
+              <code>due</code> = Wiederholungsobjekt → <i>Fälligkeitsdatum</i>,
+              <code>created</code> = Wiederholungsobjekt → <i>Erstellungsdatum</i>.</li>
+            <li>Darunter <b>„Wörterbuchwert abrufen“</b>: Wert für <code>ergebnis</code> in <i>Inhalte von URL</i>.</li>
+            <li><b>„Wenn“</b> Wörterbuchwert <i>ist</i> <code>ok</code> → darin <b>„Erinnerungen entfernen“</b> mit <i>Wiederholungsobjekt</i>. (Bei Fehlern bleibt die Erinnerung stehen und wird beim nächsten Mal erneut versucht.)</li>
+            <li><b>Automation</b> (Kurzbefehle → Automation → +): z. B. <i>Tageszeit</i> 7, 12, 17 und 21 Uhr, <i>App „Erinnerungen“ wird geschlossen</i> und <i>CarPlay wird getrennt</i> – jeweils „Eingang abgleichen“ ausführen und <b>„Sofort ausführen“</b> wählen.</li>
+          </ol>
+          <p class="muted small">Tipp: Den Kurzbefehl kannst du auch direkt starten – „Hey Siri, Eingang abgleichen“.</p>
+        </details>
+      </div>
+
+      <h2 class="section-title">Zuletzt angekommen</h2>
       <ul class="card mi-log" id="mi-log"></ul>
      </div>
 

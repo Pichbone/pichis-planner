@@ -187,7 +187,7 @@
     "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" },
     "notizen": { id: "notes", title: "Notizen", module: "notes" },
     "tagebuch": { id: "journal", title: "Tagebuch", module: "journal" },
-    "mail": { id: "mailin", title: "Aufgaben per Mail", module: "mailin" }
+    "mail": { id: "mailin", title: "Eingang", module: "mailin" }
   };
   let activeView = null;
 
