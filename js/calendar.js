@@ -28,7 +28,9 @@
     showTodos: storageGet("pp_cal_todos") === "1",
     showShopping: storageGet("pp_cal_shop") === "1",
     showNotes: storageGet("pp_cal_notes") !== "0",
+    showBdays: storageGet("pp_cal_bdays") !== "0",
     notes: [],
+    bdays: [],
     todos: [],
     shopping: [],
     loading: false,
@@ -123,6 +125,14 @@
     } else {
       cal.notes = [];
     }
+    if (cal.showBdays) {
+      jobs.push(sb.from("birthdays")
+        .select("id, name, birth_month, birth_day, birth_year, relation, tag_ids, is_private")
+        .eq("household_id", hid)
+        .then(r => { cal.bdays = r.error ? [] : r.data; }));
+    } else {
+      cal.bdays = [];
+    }
     if (cal.showShopping) {
       jobs.push(Promise.all([
         sb.from("shopping_lists").select("id, name, sort_order").eq("household_id", hid).order("sort_order"),
@@ -136,6 +146,14 @@
       cal.shopping = [];
     }
     await Promise.all(jobs);
+  }
+
+  // Geburtstage an einem Tag (mit Tag-Filter wie bei Terminen)
+  function bdaysOn(iso) {
+    if (!cal.showBdays || !PP.birthdays) return [];
+    return PP.birthdays.on(cal.bdays, iso)
+      .filter(b => !cal.tagFilter || (b.tag_ids || []).includes(cal.tagFilter))
+      .sort((a, b) => a.name.localeCompare(b.name, "de"));
   }
 
   function todosOn(iso) {
@@ -318,7 +336,8 @@
       if (iso === cal.selected) cls.push("selected");
       const dots = list.slice(0, 4).map(ev => `<i style="background:${escapeHtml(ev.calendar_color)}"></i>`).join("") +
         (cal.showTodos && cal.todos.some(t => t.due_date === iso && !t.is_done) ? '<i class="todo-dot"></i>' : "") +
-        (cal.showNotes && cal.notes.some(n => n.note_date === iso) ? '<i class="note-dot"></i>' : "");
+        (cal.showNotes && cal.notes.some(n => n.note_date === iso) ? '<i class="note-dot"></i>' : "") +
+        (bdaysOn(iso).length ? '<i class="bday-dot"></i>' : "");
       grid += `<button class="${cls.join(" ")}" data-day="${iso}" aria-label="${longDate(iso)}, ${list.length} Termine">
         <span class="num">${d.getDate()}</span><span class="dots">${dots}${list.length > 4 ? "<b>+</b>" : ""}</span>
       </button>`;
@@ -347,8 +366,25 @@
         }).join("")}</ul>`
       : `<p class="muted cal-empty">${cal.loading ? "Termine werden geladen …" : "Keine Termine."}</p>`;
 
-    // Aufgaben des Tages
+    // Geburtstage des Tages
     let extra = "";
+    const bds = bdaysOn(cal.selected);
+    if (bds.length) {
+      extra += `<h4 class="cal-sub">🎂 Geburtstage</h4><ul class="events">${bds.map(b => {
+        const tags = (b.tag_ids || []).map(id => cal.tags.find(t => t.id === id)).filter(Boolean);
+        const sub = [b.relation, b.age > 0 ? (cal.selected === today ? `wird heute ${b.age}` : `wird ${b.age}`) : ""].filter(Boolean).join(" · ");
+        return `<li><button class="cal-note cal-bday" data-cal-bday="${b.id}">
+          <span class="event-time">🎂</span>
+          <span class="event-body">
+            <span class="event-title">${escapeHtml(b.name)}${b.is_private ? ' <span class="muted">🔒</span>' : ""}</span>
+            ${sub ? `<span class="event-sub">${escapeHtml(sub)}</span>` : ""}
+            ${tags.length ? `<span class="tag-row">${tags.map(t => tagChip(t)).join("")}</span>` : ""}
+          </span>
+        </button></li>`;
+      }).join("")}</ul>`;
+    }
+
+    // Aufgaben des Tages
     if (cal.showTodos) {
       const tds = todosOn(cal.selected);
       if (tds.length) {
@@ -813,6 +849,7 @@
     $("#cal-show-todos").checked = cal.showTodos;
     $("#cal-show-shop").checked = cal.showShopping;
     $("#cal-show-notes").checked = cal.showNotes;
+    $("#cal-show-bdays").checked = cal.showBdays;
 
     $("#cal-tag-list").innerHTML = cal.tags.length
       ? cal.tags.map(t => `<li class="cal-row">${tagChip(t)}<button class="icon-btn small" data-del-tag="${t.id}" aria-label="Tag löschen">✕</button></li>`).join("")
@@ -821,10 +858,12 @@
 
   $("#sheet-calsettings").addEventListener("change", async e => {
     const t = e.target;
-    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes") {
+    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes" || t.id === "cal-show-bdays") {
       cal.showTodos = $("#cal-show-todos").checked;
       cal.showShopping = $("#cal-show-shop").checked;
       cal.showNotes = $("#cal-show-notes").checked;
+      cal.showBdays = $("#cal-show-bdays").checked;
+      storageSet("pp_cal_bdays", cal.showBdays ? "1" : "0");
       storageSet("pp_cal_todos", cal.showTodos ? "1" : "0");
       storageSet("pp_cal_shop", cal.showShopping ? "1" : "0");
       storageSet("pp_cal_notes", cal.showNotes ? "1" : "0");
@@ -966,6 +1005,7 @@
     if (t.id === "cal-plan") { if (PP.planner) PP.planner.open(cal.selected); return; }
     if (t.id === "cal-note-add") { if (PP.notes) PP.notes.create({ date: cal.selected }); return; }
     if (t.dataset.calNote) { if (PP.notes) PP.notes.open(t.dataset.calNote); return; }
+    if (t.dataset.calBday) { if (PP.birthdays) PP.birthdays.open(t.dataset.calBday); return; }
     if (t.dataset.calTodo) {
       const td = cal.todos.find(x => x.id === t.dataset.calTodo);
       if (!td) return;
@@ -1018,6 +1058,11 @@
       if (!cal.active) return;
       cal.cache.clear();
       try { await loadBase(); subscribe(); await loadEvents(true); } catch (err) { console.error(err); }
+    },
+    async refreshBirthdays() {
+      if (!cal.active) return;
+      await loadExtras();
+      render();
     },
     refreshTile() { /* Kalender-Kachel zeigt keine Zahl, um iCloud nicht unnötig abzufragen */ },
     reset() {

@@ -781,11 +781,14 @@
     f.base.value = opts.base || "";
     $("#compose-base-row").hidden = !opts.base;
     $("#compose-base-label").textContent = opts.from ? `Grundlage: „${opts.from}“` : "Grundlage";
-    f.type.value = storageGet("pp_compose_type") || "mail";
-    f.tone.value = storageGet("pp_compose_tone") || "freundlich";
+    f.type.value = opts.type || storageGet("pp_compose_type") || "mail";
+    f.tone.value = opts.tone || storageGet("pp_compose_tone") || "freundlich";
+    f.recipient.value = opts.recipient || "";
+    f.points.value = opts.points || "";
     $("#compose-result").hidden = true;
     openSheet("sheet-wiki-compose");
   }
+  PP.compose = openCompose;
 
   $("#form-compose").addEventListener("submit", e => {
     e.preventDefault();

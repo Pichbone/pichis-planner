@@ -167,6 +167,11 @@
           <div class="tile-name">Kalender</div>
           <div class="tile-status">iCloud · Öffnen</div>
         </a>
+        <a class="tile tile-active tile-berry" href="#/geburtstage">
+          <div class="tile-icon">🎂</div>
+          <div class="tile-name">Geburtstage</div>
+          <div class="tile-status" id="tile-bd-status">Öffnen</div>
+        </a>
         <a class="tile tile-active tile-teal" href="#/nachrichten">
           <div class="tile-icon">💬</div>
           <div class="tile-name">Nachrichten</div>
@@ -340,6 +345,26 @@
 
       <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
       <div id="jn-items"></div>
+     </div>
+
+     <!-- ===== Geburtstage ===== -->
+     <div id="view-birthdays" class="view" hidden>
+      <div class="note-toolbar">
+        <input type="search" id="bd-search" placeholder="Namen suchen" aria-label="Geburtstage durchsuchen" autocomplete="off">
+        <button class="icon-btn icon-btn-accent" id="btn-bd-add" aria-label="Neuer Geburtstag">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div id="bd-hero"></div>
+      <div class="chips" id="bd-chips"></div>
+      <div id="bd-items"></div>
+      <form id="form-bd-push" class="card jn-reminder bd-push" autocomplete="off">
+        <label class="switch"><input type="checkbox" name="enabled"><span>🔔 An Geburtstage erinnern (Mitteilung aufs Handy)</span></label>
+        <label id="bd-push-time" class="jn-reminder-time" hidden>um
+          <input type="time" name="time" step="300" value="08:00"> Uhr
+        </label>
+        <p class="muted small">Wann vorher erinnert wird, stellst du je Geburtstag ein. Gilt nur für dich.</p>
+      </form>
      </div>
 
      <!-- ===== Wiki ===== -->
@@ -686,6 +711,85 @@
     <span class="jn-viewer-close">✕</span>
   </div>
 
+  <!-- Geburtstag -->
+  <div id="sheet-bd" class="sheet sheet-tall" hidden role="dialog" aria-label="Geburtstag">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="bd-sheet-title">Neuer Geburtstag</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-bd" class="form" autocomplete="off">
+      <label>Name
+        <input type="text" name="name" maxlength="120" placeholder="z. B. Oma Hilde">
+      </label>
+      <div class="bd-date-row">
+        <label>Tag
+          <select name="day"><option value="">–</option><option value="1">1.</option><option value="2">2.</option><option value="3">3.</option><option value="4">4.</option><option value="5">5.</option><option value="6">6.</option><option value="7">7.</option><option value="8">8.</option><option value="9">9.</option><option value="10">10.</option><option value="11">11.</option><option value="12">12.</option><option value="13">13.</option><option value="14">14.</option><option value="15">15.</option><option value="16">16.</option><option value="17">17.</option><option value="18">18.</option><option value="19">19.</option><option value="20">20.</option><option value="21">21.</option><option value="22">22.</option><option value="23">23.</option><option value="24">24.</option><option value="25">25.</option><option value="26">26.</option><option value="27">27.</option><option value="28">28.</option><option value="29">29.</option><option value="30">30.</option><option value="31">31.</option></select>
+        </label>
+        <label>Monat
+          <select name="month"><option value="">–</option><option value="1">Januar</option><option value="2">Februar</option><option value="3">März</option><option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option><option value="7">Juli</option><option value="8">August</option><option value="9">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option></select>
+        </label>
+        <label>Jahr
+          <input type="text" name="year" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="optional">
+        </label>
+      </div>
+      <p class="muted small bd-age-hint" id="bd-age-hint"></p>
+      <label>Beziehung <span class="hint">(optional)</span>
+        <input type="text" name="relation" maxlength="60" placeholder="z. B. Onkel, Kollegin, Patenkind">
+      </label>
+
+      <h3 class="sheet-sub">Tags</h3>
+      <div class="chip-wrap" id="bd-edit-tags"></div>
+      <div class="inline-form">
+        <input type="text" name="new_tag" maxlength="40" placeholder="Neuer Tag, z. B. Familie" aria-label="Neuer Tag">
+        <button type="button" class="btn btn-small" id="btn-bd-tag-add">Anlegen</button>
+      </div>
+
+      <h3 class="sheet-sub">Erinnern</h3>
+      <div class="chip-wrap" id="bd-remind"></div>
+
+      <label>Notizen <span class="hint">(z. B. Geschenkideen)</span>
+        <textarea name="notes" rows="3" maxlength="2000"></textarea>
+      </label>
+      <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div class="note-actions">
+      <button type="button" class="link" id="btn-bd-wish" hidden>✨ Glückwunsch formulieren</button>
+      <button type="button" class="link danger-link" id="btn-bd-delete" hidden>Löschen</button>
+    </div>
+  </div>
+
+  <!-- Geburtstage aus Kontakten importieren -->
+  <div id="sheet-bd-import" class="sheet sheet-tall" hidden role="dialog" aria-label="Aus Kontakten importieren">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>📇 Aus Kontakten</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="bd-import-step1">
+      <p>Exportiere deine Kontakte als Visitenkarte (.vcf) und wähle die Datei hier aus. Übernommen werden nur Kontakte, bei denen ein Geburtstag eingetragen ist.</p>
+      <ol class="bd-howto">
+        <li><strong>iPhone:</strong> Kontakte-App → oben links „Listen“ → Liste (z. B. „Alle Kontakte“) lange drücken → „Exportieren“ → „In Dateien sichern“.</li>
+        <li><strong>Mac:</strong> Kontakte-App → Kontakte markieren (⌘A) → Ablage → Exportieren → „vCard exportieren …“.</li>
+      </ol>
+      <label class="btn btn-primary btn-block bd-file-btn">📂 vCard-Datei auswählen
+        <input type="file" id="bd-import-file" accept=".vcf,text/vcard,text/x-vcard" hidden>
+      </label>
+    </div>
+    <div id="bd-import-step2" hidden>
+      <p class="muted small" id="bd-import-summary"></p>
+      <h3 class="sheet-sub">Tag für alle <span class="hint">(optional)</span></h3>
+      <div class="chip-wrap" id="bd-import-tags"></div>
+      <div class="bd-import-head">
+        <h3 class="sheet-sub">Kontakte</h3>
+        <button type="button" class="link" id="btn-bd-import-all">Alle an/aus</button>
+      </div>
+      <ul class="bd-import-list" id="bd-import-list"></ul>
+      <button type="button" class="btn btn-primary btn-block" id="btn-bd-import-go">Übernehmen</button>
+    </div>
+  </div>
+
   <!-- Wiki-Seite bearbeiten -->
   <div id="sheet-wiki" class="sheet sheet-tall" hidden role="dialog" aria-label="Wiki-Seite">
     <div class="sheet-handle"></div>
@@ -1013,6 +1117,7 @@
       <label class="switch"><input type="checkbox" id="cal-show-todos"><span>✅ Aufgaben im Kalender anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-shop"><span>🛒 Einkaufsliste bei „Heute“ anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-notes"><span>📝 Notizen mit Datum anzeigen</span></label>
+      <label class="switch"><input type="checkbox" id="cal-show-bdays"><span>🎂 Geburtstage anzeigen</span></label>
       <p class="muted small">Gilt für dieses Gerät.</p>
     </div>
 
@@ -1189,5 +1294,6 @@
   <script src="/js/journal.js"></script>
   <script src="/js/mailin.js"></script>
   <script src="/js/wiki.js"></script>
+  <script src="/js/birthdays.js"></script>
 </body>
 </html>

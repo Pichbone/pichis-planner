@@ -1236,3 +1236,57 @@ article.wiki-content { background: var(--surface); border-radius: var(--radius);
 }
 .ask-sources a { display: block; padding: 8px 10px; background: var(--surface); border-radius: 10px; color: inherit; text-decoration: none; }
 .ask-sources .src-ref { vertical-align: middle; margin-right: 4px; }
+
+/* =========================================================
+   Geburtstage
+   ========================================================= */
+:root { --berry: #9D174D; --berry-soft: #F9E1EC; }
+@media (prefers-color-scheme: dark) { :root { --berry: #F08DB8; --berry-soft: #36202B; } }
+.tile-berry { border-color: var(--berry); background: var(--berry-soft); }
+.tile-berry .tile-status { color: var(--berry); }
+.cal-day .dots .bday-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--berry); box-shadow: 0 0 0 1.5px var(--berry-soft); }
+.cal-note.cal-bday { background: var(--berry-soft); border-left-color: var(--berry); }
+.cal-bday .event-time { font-size: 1.1rem; }
+
+.bd-hero {
+  display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; padding: 14px 16px;
+  background: var(--berry-soft); border: 1px solid var(--berry); border-radius: var(--radius);
+}
+.bd-hero-icon { font-size: 2rem; line-height: 1; }
+.bd-hero-text { line-height: 1.45; }
+.bd-hero-text .btn-row { margin-top: 8px; }
+.bd-hero .btn { background: var(--berry); color: #fff; border-color: var(--berry); }
+
+.bd-list, .bd-import-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bd-row, .bd-import-row {
+  display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: inherit; font: inherit; cursor: pointer;
+}
+.bd-row:active { transform: scale(.99); }
+.bd-row.is-today { border-color: var(--berry); background: var(--berry-soft); }
+.bd-date {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 46px; height: 46px; border-radius: 12px; background: var(--berry-soft); color: var(--berry); line-height: 1;
+}
+.bd-date b { font-size: 1.15rem; }
+.bd-date small { font-size: .68rem; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+.bd-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bd-name { font-weight: 600; overflow-wrap: anywhere; }
+.bd-sub { font-size: .82rem; color: var(--muted); }
+.bd-import-link { text-align: center; margin: 14px 0 4px; }
+.bd-push { margin-top: 18px; }
+
+.bd-date-row { display: grid; grid-template-columns: 1fr 1.6fr 1.3fr; gap: 8px; }
+.bd-date-row label { min-width: 0; }
+.bd-date-row select, .bd-date-row input { width: 100%; min-width: 0; }
+.bd-age-hint { margin: -6px 0 0; min-height: 1em; color: var(--berry); }
+.form .bd-date-row .hint { font-weight: 400; }
+
+.bd-howto { padding-left: 1.2em; line-height: 1.5; font-size: .92rem; }
+.bd-howto li { margin-bottom: 6px; }
+.bd-file-btn { cursor: pointer; text-align: center; }
+.bd-import-head { display: flex; justify-content: space-between; align-items: center; }
+.bd-import-row { cursor: pointer; }
+.bd-import-row input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--berry); }
+.bd-import-row.dupe { opacity: .6; }
+.bd-import-list { max-height: 45vh; overflow-y: auto; margin-bottom: 12px; }
