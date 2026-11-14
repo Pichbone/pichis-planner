@@ -602,6 +602,7 @@
       <h3 id="ev-title" class="ev-title"></h3>
       <p id="ev-when"></p>
       <p id="ev-where" class="muted"></p>
+      <div class="route-links" id="ev-route-view" hidden></div>
       <p id="ev-calendar" class="ev-calendar small"></p>
       <p id="ev-notes" class="ev-notes small"></p>
     </div>
@@ -658,9 +659,13 @@
           <option value="keep" hidden>Wie im Apple-Kalender</option>
         </select>
       </label>
-      <label>Ort
-        <input type="text" name="location" maxlength="300" placeholder="optional">
-      </label>
+      <div class="place-field">
+        <label>Ort
+          <input type="text" name="location" maxlength="300" placeholder="Adresse oder Ort suchen, z. B. Kurhaus Wiesbaden" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="place-list" aria-expanded="false">
+        </label>
+        <ul class="place-list" id="place-list" role="listbox" hidden></ul>
+        <div class="route-links" id="ev-route-edit" hidden></div>
+      </div>
       <label>Notiz
         <textarea name="notes" rows="2" maxlength="5000" placeholder="optional"></textarea>
       </label>

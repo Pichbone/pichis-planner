@@ -475,6 +475,7 @@
     $("#ev-when").textContent = when + (ev.recurring ? " · wiederholt sich" : "");
     $("#ev-where").textContent = ev.location ? "📍 " + ev.location : "";
     $("#ev-where").hidden = !ev.location;
+    renderRoute("#ev-route-view", ev.location);
     $("#ev-notes").textContent = ev.notes || "";
     $("#ev-notes").hidden = !ev.notes;
     const owner = ev.owner_id === state.session.user.id ? "" : " von " + (memberName(ev.owner_id) || "?");
@@ -525,6 +526,7 @@
       f.reset();
       f.title.value = ev.title;
       f.location.value = ev.location || "";
+      renderRoute("#ev-route-edit", f.location.value);
       f.notes.value = ev.notes || "";
       f.all_day.checked = ev.all_day;
       if (ev.all_day) {
@@ -573,6 +575,8 @@
     const f = $("#form-event");
     f.reset();
     ["all_day", "start_date", "end_date", "start_time", "end_time"].forEach(n => { f[n].disabled = false; });
+    renderRoute("#ev-route-edit", "");
+    closePlaces();
 
     // Startzeit: heute nächste volle Stunde, sonst 10 Uhr
     let start = "10:00", end = "11:00", day = cal.selected;
@@ -710,6 +714,146 @@
       alarm: f.alarm.value
     };
   }
+
+  // ---------- Ort: Routenplaner und Ortssuche ----------
+  function routeLinks(place) {
+    const q = encodeURIComponent(place);
+    return {
+      apple: `https://maps.apple.com/?daddr=${q}&dirflg=d`,
+      google: `https://www.google.com/maps/dir/?api=1&destination=${q}`
+    };
+  }
+
+  function renderRoute(sel, place) {
+    const box = $(sel);
+    const p = String(place || "").trim();
+    if (!p) { box.hidden = true; box.innerHTML = ""; return; }
+    const url = p.match(/https?:\/\/\S+/);
+    if (url) {
+      // Online-Termin (Teams, Zoom …): Link statt Route
+      box.innerHTML = `<a class="route-btn" href="${escapeHtml(url[0])}" target="_blank" rel="noopener">🔗 Link öffnen</a>`;
+    } else {
+      const r = routeLinks(p);
+      box.innerHTML = `<a class="route-btn route-main" href="${escapeHtml(r.apple)}" target="_blank" rel="noopener">🧭 Route (Apple Karten)</a>
+        <a class="route-btn" href="${escapeHtml(r.google)}" target="_blank" rel="noopener">Google Maps</a>`;
+    }
+    box.hidden = false;
+  }
+
+  // Ortssuche über OpenStreetMap (Photon) – ohne Schlüssel, nur beim Tippen
+  const place = { timer: null, token: 0, items: [], active: -1, bias: null };
+
+  async function placeBias() {
+    if (place.bias !== null) return place.bias;
+    place.bias = false;
+    try {
+      // Nur wenn der Standort schon erlaubt wurde – sonst keine Nachfrage
+      const st = navigator.permissions ? await navigator.permissions.query({ name: "geolocation" }) : null;
+      if (st && st.state === "granted") {
+        place.bias = await new Promise(res => navigator.geolocation.getCurrentPosition(
+          p => res({ lat: p.coords.latitude.toFixed(3), lon: p.coords.longitude.toFixed(3) }), () => res(false), { maximumAge: 3600000, timeout: 4000 }));
+      }
+    } catch { /* egal */ }
+    return place.bias;
+  }
+
+  function placeLabel(pr) {
+    const street = [pr.street, pr.housenumber].filter(Boolean).join(" ");
+    const town = [pr.postcode, pr.city || pr.town || pr.village || pr.district].filter(Boolean).join(" ");
+    const parts = [];
+    if (pr.name && pr.name !== pr.street && pr.name !== (pr.city || "")) parts.push(pr.name);
+    if (street) parts.push(street);
+    if (town) parts.push(town);
+    else if (pr.state) parts.push(pr.state);
+    if (pr.countrycode && pr.countrycode !== "DE" && pr.country) parts.push(pr.country);
+    return [...new Set(parts)].join(", ");
+  }
+
+  function closePlaces() {
+    const list = $("#place-list");
+    list.hidden = true;
+    list.innerHTML = "";
+    place.items = [];
+    place.active = -1;
+    $("#form-event").location.setAttribute("aria-expanded", "false");
+  }
+
+  function showPlaces() {
+    const list = $("#place-list");
+    if (!place.items.length) { closePlaces(); return; }
+    list.innerHTML = place.items.map((it, i) => `<li role="option" id="place-${i}" class="${i === place.active ? "active" : ""}" data-place="${i}" aria-selected="${i === place.active}">
+      <span class="place-name">${escapeHtml(it.title)}</span>${it.sub ? `<span class="place-sub">${escapeHtml(it.sub)}</span>` : ""}
+    </li>`).join("") + `<li class="place-credit" aria-hidden="true">Suche: © OpenStreetMap</li>`;
+    list.hidden = false;
+    $("#form-event").location.setAttribute("aria-expanded", "true");
+  }
+
+  async function searchPlaces(q) {
+    const token = ++place.token;
+    try {
+      const bias = await placeBias();
+      const url = new URL("https://photon.komoot.io/api/");
+      url.searchParams.set("q", q);
+      url.searchParams.set("lang", "de");
+      url.searchParams.set("limit", "6");
+      if (bias) { url.searchParams.set("lat", bias.lat); url.searchParams.set("lon", bias.lon); }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      if (token !== place.token) return;
+      const seen = new Set();
+      place.items = (data.features || []).map(f => {
+        const pr = f.properties || {};
+        const label = placeLabel(pr);
+        const [first, ...rest] = label.split(", ");
+        return { label, title: first, sub: rest.join(", ") };
+      }).filter(it => it.label && !seen.has(it.label) && seen.add(it.label));
+      place.active = -1;
+      showPlaces();
+    } catch (err) {
+      console.warn("Ortssuche:", err);
+      if (token === place.token) closePlaces();
+    }
+  }
+
+  function pickPlace(i) {
+    const it = place.items[i];
+    if (!it) return;
+    const input = $("#form-event").location;
+    input.value = it.label;
+    closePlaces();
+    renderRoute("#ev-route-edit", input.value);
+  }
+
+  $("#form-event").location.addEventListener("input", e => {
+    const q = e.target.value.trim();
+    renderRoute("#ev-route-edit", q);
+    clearTimeout(place.timer);
+    if (q.length < 3 || /https?:\/\//.test(q)) { place.token++; closePlaces(); return; }
+    place.timer = setTimeout(() => searchPlaces(q), 350);
+  });
+  $("#form-event").location.addEventListener("keydown", e => {
+    if ($("#place-list").hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = place.items.length;
+      place.active = (place.active + (e.key === "ArrowDown" ? 1 : -1) + n) % n;
+      showPlaces();
+    } else if (e.key === "Enter" && place.active >= 0) {
+      e.preventDefault();
+      pickPlace(place.active);
+    } else if (e.key === "Escape") {
+      closePlaces();
+    }
+  });
+  $("#form-event").location.addEventListener("blur", () => setTimeout(closePlaces, 200));
+  // pointerdown statt click: sonst schließt das Verlassen des Feldes die Liste zu früh
+  $("#place-list").addEventListener("pointerdown", e => {
+    const li = e.target.closest("[data-place]");
+    if (!li) return;
+    e.preventDefault();
+    pickPlace(+li.dataset.place);
+  });
 
   // Hinweis bei „Werktags“: wann die Serie läuft (und ob sie erst am Montag beginnt)
   function updateRepeatHint() {
