@@ -8,7 +8,7 @@
   const PP = window.PP;
   const { sb, state, $, toast, escapeHtml, translateError, storageGet, storageSet, memberName, openSheet, closeSheets } = PP;
 
-  const REPEAT_LABEL = { none: "", daily: "täglich", weekly: "wöchentlich", monthly: "monatlich", yearly: "jährlich" };
+  const REPEAT_LABEL = { none: "", daily: "täglich", weekdays: "werktags (Mo–Fr)", weekly: "wöchentlich", monthly: "monatlich", yearly: "jährlich" };
   const WEEKDAYS = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
   const WEEKDAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
@@ -88,7 +88,8 @@
 
     // Wiederholung
     let m;
-    if (take(new RegExp(B + "(?:jeden tag|täglich)" + E, "i"))) out.repeat = "daily";
+    if (take(new RegExp(B + "(?:jeden werktag|werktags|an werktagen|mo(?:ntags?)?\\s*(?:-|–|bis)\\s*fr(?:eitags?)?)" + E, "i"))) out.repeat = "weekdays";
+    else if (take(new RegExp(B + "(?:jeden tag|täglich)" + E, "i"))) out.repeat = "daily";
     else if ((m = take(new RegExp(B + "jeden (" + WEEKDAYS.join("|") + ")" + E, "i")))) {
       out.repeat = "weekly";
       out.due_date = isoDate(nextWeekday(m[1].toLowerCase(), true));
