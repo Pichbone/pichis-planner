@@ -187,6 +187,11 @@
           <div class="tile-name">Tagebuch</div>
           <div class="tile-status" id="tile-jn-status">Nur für dich</div>
         </a>
+        <a class="tile tile-active tile-indigo" href="#/wiki">
+          <div class="tile-icon">📚</div>
+          <div class="tile-name">Wiki</div>
+          <div class="tile-status" id="tile-wiki-status">Öffnen</div>
+        </a>
         <div class="tile">
           <div class="tile-icon">✉️</div>
           <div class="tile-name">Einladungen</div>
@@ -335,6 +340,28 @@
 
       <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
       <div id="jn-items"></div>
+     </div>
+
+     <!-- ===== Wiki ===== -->
+     <div id="view-wiki" class="view" hidden>
+      <div id="wiki-list-wrap">
+        <div class="note-toolbar">
+          <input type="search" id="wiki-search" placeholder="Wiki &amp; Anleitungen durchsuchen" aria-label="Wiki durchsuchen" autocomplete="off">
+          <button class="icon-btn icon-btn-accent" id="btn-wiki-add" aria-label="Neue Seite">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <div class="wiki-ai-row">
+          <button class="btn btn-small wiki-ai" id="btn-wiki-ask">✨ Frag das Wiki</button>
+          <button class="btn btn-small wiki-ai" id="btn-wiki-compose">✨ Formulieren</button>
+        </div>
+        <div class="chips" id="wiki-chips"></div>
+        <div id="wiki-items"></div>
+      </div>
+      <div id="wiki-page-wrap" hidden>
+        <a href="#/wiki" class="link wiki-back">‹ Alle Seiten</a>
+        <div id="wiki-page"></div>
+      </div>
      </div>
 
      <!-- ===== Notizen ===== -->
@@ -657,6 +684,166 @@
   <div id="jn-viewer" class="jn-viewer" hidden role="dialog" aria-label="Bild">
     <img id="jn-viewer-img" alt="">
     <span class="jn-viewer-close">✕</span>
+  </div>
+
+  <!-- Wiki-Seite bearbeiten -->
+  <div id="sheet-wiki" class="sheet sheet-tall" hidden role="dialog" aria-label="Wiki-Seite">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="wiki-sheet-title">Neue Seite</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-wiki" class="form" autocomplete="off">
+      <div class="wiki-title-row">
+        <input type="text" name="icon" maxlength="8" placeholder="📄" class="wiki-icon-input" aria-label="Symbol (Emoji)">
+        <input type="text" name="title" maxlength="200" placeholder="Titel, z. B. Waschmaschine Miele" class="note-title-input" aria-label="Titel">
+      </div>
+      <div class="seg wiki-kind" role="radiogroup" aria-label="Art">
+        <label><input type="radio" name="kind" value="page" checked><span>📄 Seite</span></label>
+        <label><input type="radio" name="kind" value="template"><span>✉️ Vorlage (Brief/Mail)</span></label>
+      </div>
+      <label id="wiki-cat-row">Kategorie
+        <input type="text" name="category" maxlength="60" list="wiki-cats" placeholder="z. B. Haushalt &amp; Geräte">
+        <datalist id="wiki-cats"></datalist>
+      </label>
+      <label id="wiki-subject-row" hidden>Betreff
+        <input type="text" name="subject" maxlength="300" placeholder="z. B. Kündigung Vertrag {{Vertragsnummer}}">
+      </label>
+      <p class="muted small" id="wiki-tpl-hint" hidden>Platzhalter in doppelten geschweiften Klammern, z. B. {{Name}}, {{Datum}}, {{Vertragsnummer}} – beim Verwenden werden sie abgefragt. Knopf „{ }“ fügt einen ein.</p>
+
+      <div class="wiki-toolbar" id="wiki-toolbar" role="toolbar" aria-label="Formatierung">
+        <button type="button" data-cmd="h2" title="Überschrift">H1</button>
+        <button type="button" data-cmd="h3" title="Zwischenüberschrift">H2</button>
+        <button type="button" data-cmd="p" title="Normaler Text">¶</button>
+        <button type="button" data-cmd="bold" title="Fett"><b>F</b></button>
+        <button type="button" data-cmd="italic" title="Kursiv"><i>K</i></button>
+        <button type="button" data-cmd="underline" title="Unterstrichen"><u>U</u></button>
+        <button type="button" data-cmd="insertUnorderedList" title="Aufzählung">•≡</button>
+        <button type="button" data-cmd="insertOrderedList" title="Nummerierung">1.</button>
+        <button type="button" data-cmd="blockquote" title="Hinweis-Kasten">❝</button>
+        <button type="button" data-cmd="insertHorizontalRule" title="Trennlinie">―</button>
+        <button type="button" data-cmd="link" title="Link oder Wiki-Seite">🔗</button>
+        <button type="button" data-cmd="image" title="Bild einfügen">🖼️</button>
+        <button type="button" data-cmd="placeholder" title="Platzhalter">{ }</button>
+        <button type="button" data-cmd="removeFormat" title="Formatierung entfernen">✕F</button>
+        <button type="button" data-cmd="undo" title="Rückgängig">↶</button>
+        <button type="button" data-cmd="redo" title="Wiederholen">↷</button>
+      </div>
+      <div id="wiki-editor" class="wiki-editor wiki-content" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Inhalt" data-placeholder="Inhalt schreiben oder einfügen …"></div>
+      <input type="file" id="wiki-img-input" accept="image/*" multiple hidden>
+
+      <div class="switches">
+        <label class="switch"><input type="checkbox" name="is_pinned"><span>📌 Oben anheften</span></label>
+        <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      </div>
+
+      <h3 class="sheet-sub">Tags</h3>
+      <div class="chip-wrap" id="wiki-edit-tags"></div>
+      <div class="inline-form">
+        <input type="text" name="new_tag" maxlength="40" placeholder="Neuer Tag" aria-label="Neuer Tag">
+        <button type="button" class="btn btn-small" id="btn-wiki-tag-add">Anlegen</button>
+      </div>
+    </form>
+
+    <h3 class="sheet-sub">Anhänge</h3>
+    <ul class="file-list" id="wiki-edit-files"></ul>
+    <button type="button" class="btn btn-secondary btn-block" id="btn-wiki-file">📎 Anleitung / Datei hinzufügen</button>
+    <input type="file" id="wiki-file-input" multiple hidden>
+    <p class="muted small">PDFs werden durchsuchbar gemacht – auch „Frag das Wiki“ findet dann Antworten darin.</p>
+
+    <button type="submit" form="form-wiki" class="btn btn-primary btn-block">Speichern</button>
+    <div class="note-actions">
+      <span></span>
+      <button type="button" class="link danger-link" id="btn-wiki-delete" hidden>Seite löschen</button>
+    </div>
+  </div>
+
+  <!-- Vorlage verwenden -->
+  <div id="sheet-wiki-use" class="sheet sheet-tall" hidden role="dialog" aria-label="Vorlage verwenden">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>✍️ <span id="wiki-use-title">Vorlage</span></h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div class="form" id="wiki-use-fields"></div>
+    <h3 class="sheet-sub">Vorschau</h3>
+    <div class="form">
+      <label>Betreff<input type="text" id="wiki-use-subject"></label>
+      <label>Text<textarea id="wiki-use-body" rows="12" class="wiki-out"></textarea></label>
+    </div>
+    <div class="btn-row wiki-out-actions">
+      <button type="button" class="btn btn-primary btn-small" data-act="copy">📋 Kopieren</button>
+      <button type="button" class="btn btn-small" data-act="mail">✉️ Als Mail</button>
+      <button type="button" class="btn btn-small" data-act="share">↗︎ Teilen</button>
+      <button type="button" class="btn btn-small" data-act="ai">✨ Mit KI anpassen</button>
+    </div>
+  </div>
+
+  <!-- Formulieren mit KI -->
+  <div id="sheet-wiki-compose" class="sheet sheet-tall" hidden role="dialog" aria-label="Formulieren">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>✨ Formulieren</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-compose" class="form" autocomplete="off">
+      <div class="form-row form-row-even">
+        <label>Art
+          <select name="type">
+            <option value="mail">E-Mail</option>
+            <option value="brief">Brief</option>
+            <option value="nachricht">Kurze Nachricht</option>
+          </select>
+        </label>
+        <label>Ton
+          <select name="tone">
+            <option value="freundlich">Freundlich</option>
+            <option value="foermlich">Förmlich</option>
+            <option value="bestimmt">Bestimmt</option>
+            <option value="locker">Locker</option>
+          </select>
+        </label>
+      </div>
+      <label>An wen? <span class="hint">(optional)</span>
+        <input type="text" name="recipient" maxlength="200" placeholder="z. B. Vermieter Herr Schulz, Kita, Versicherung">
+      </label>
+      <label>Worum geht es?
+        <textarea name="points" rows="4" maxlength="4000" placeholder="Stichpunkte reichen, z. B.: Heizung seit Montag kalt, bitte bis Freitag Handwerker schicken"></textarea>
+      </label>
+      <label id="compose-base-row" hidden><span id="compose-base-label">Grundlage</span>
+        <textarea name="base" rows="5" maxlength="20000"></textarea>
+      </label>
+      <label class="switch"><input type="checkbox" name="thorough"><span>Gründlicher (etwas teurer)</span></label>
+      <button type="submit" class="btn btn-primary btn-block">✨ Formulieren</button>
+    </form>
+    <div id="compose-result" hidden>
+      <h3 class="sheet-sub">Vorschlag</h3>
+      <div class="form">
+        <label id="compose-subject-row">Betreff<input type="text" id="compose-subject"></label>
+        <label>Text<textarea id="compose-body" rows="12" class="wiki-out"></textarea></label>
+      </div>
+      <div class="btn-row wiki-out-actions">
+        <button type="button" class="btn btn-primary btn-small" data-act="copy">📋 Kopieren</button>
+        <button type="button" class="btn btn-small" data-act="mail">✉️ Als Mail</button>
+        <button type="button" class="btn btn-small" data-act="share">↗︎ Teilen</button>
+        <button type="button" class="btn btn-small" data-act="save">💾 Als Vorlage</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Frag das Wiki -->
+  <div id="sheet-wiki-ask" class="sheet sheet-tall" hidden role="dialog" aria-label="Frag das Wiki">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>✨ Frag das Wiki</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-ask" class="form" autocomplete="off">
+      <textarea name="question" rows="3" maxlength="1000" placeholder="z. B. Wie entkalke ich die Kaffeemaschine? Wann läuft die Kfz-Versicherung aus?"></textarea>
+      <button type="submit" class="btn btn-primary btn-block">Fragen</button>
+    </form>
+    <div id="ask-answer" class="ask-answer"></div>
+    <p class="muted small">Claude antwortet nur aus euren Wiki-Seiten und Anhängen. Private Seiten anderer bleiben außen vor.</p>
   </div>
 
   <!-- Notiz -->
@@ -1001,5 +1188,6 @@
   <script src="/js/notes.js"></script>
   <script src="/js/journal.js"></script>
   <script src="/js/mailin.js"></script>
+  <script src="/js/wiki.js"></script>
 </body>
 </html>

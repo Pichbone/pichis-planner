@@ -187,14 +187,17 @@
     "nachrichten": { id: "messages", title: "Nachrichten", module: "messages" },
     "notizen": { id: "notes", title: "Notizen", module: "notes" },
     "tagebuch": { id: "journal", title: "Tagebuch", module: "journal" },
-    "mail": { id: "mailin", title: "Eingang", module: "mailin" }
+    "mail": { id: "mailin", title: "Eingang", module: "mailin" },
+    "wiki": { id: "wiki", title: "Wiki", module: "wiki" }
   };
   let activeView = null;
 
   function applyView() {
     if (currentScreen !== "app") return;
     const key = (location.hash || "").replace(/^#\/?/, "");
-    const view = VIEWS[key] || VIEWS[""];
+    const [base, ...rest] = key.split("/");
+    const view = VIEWS[key] || VIEWS[base] || VIEWS[""];
+    PP.route = { base, param: decodeURIComponent(rest.join("/")) };
 
     $$(".view").forEach(v => { v.hidden = v.id !== "view-" + view.id; });
     $("#btn-back").hidden = view.id === "home";
