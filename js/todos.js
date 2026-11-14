@@ -22,6 +22,7 @@
     channel: null,
     showDone: false,
     editingId: null,
+    pendingFiles: [],         // Anlagen einer neuen Aufgabe (werden nach dem Speichern hochgeladen)
     files: new Map(),
     active: false
   };
@@ -426,14 +427,37 @@
   }
 
   // ---------- Bearbeiten-Fenster ----------
-  function openEdit(id) {
-    const item = td.items.find(x => x.id === id);
+  // Neue Aufgabe im großen Fenster – optional mit dem bereits getippten Text
+  async function openNew(text = "") {
+    const me = state.session.user.id;
+    let p = { title: "", notes: "", due_date: null, due_time: null, duration_minutes: null, assigned_to: null, repeat: "none", priority: 0, is_private: false, tag_ids: [] };
+    if (text.trim()) {
+      p = { ...p, ...parseTodo(text, state.members, td.tags) };
+      for (const name of p.new_tags || []) {
+        const tag = await createTag(name);
+        if (tag) p.tag_ids.push(tag.id);
+      }
+      delete p.new_tags;
+    }
+    if (td.tagFilter && !p.tag_ids.includes(td.tagFilter)) p.tag_ids.push(td.tagFilter);
+    if (td.filter === "private") p.is_private = true;
+    if (td.filter === "mine" && !p.assigned_to && !p.is_private) p.assigned_to = me;
+    openEdit(null, { ...p, created_by: me });
+  }
+
+  function openEdit(id, preset = null) {
+    const item = id ? td.items.find(x => x.id === id) : preset;
     if (!item) return;
-    td.editingId = id;
+    td.editingId = id || null;
+    td.pendingFiles = [];
+    const isNew = !id;
+    $("#todo-sheet-title").textContent = isNew ? "Neue Aufgabe" : "Aufgabe";
+    $("#btn-delete-todo").hidden = isNew;
+    $("#btn-save-todo").textContent = isNew ? "Aufgabe anlegen" : "Speichern";
     const f = $("#form-todo");
     const me = state.session.user.id;
-    f.title.value = item.title;
-    f.notes.value = item.notes;
+    f.title.value = item.title || "";
+    f.notes.value = item.notes || "";
     f.due_date.value = item.due_date || "";
     f.due_time.value = item.due_time ? String(item.due_time).slice(0, 5) : "";
     setDurationSelect(item.duration_minutes);
@@ -442,7 +466,7 @@
     f.assigned_to.value = item.assigned_to || "";
     f.repeat.value = item.repeat;
     f.priority.checked = item.priority === 1;
-    f.is_private.checked = item.is_private;
+    f.is_private.checked = !!item.is_private;
     td.draftTags = new Set(item.tag_ids || []);
     f.new_tag.value = "";
     renderTagPicker();
@@ -453,6 +477,7 @@
       : "";
     renderFiles();
     openSheet("sheet-todo");
+    if (isNew) setTimeout(() => { f.title.focus(); f.title.setSelectionRange(f.title.value.length, f.title.value.length); }, 80);
   }
 
   $("#form-todo").addEventListener("submit", e => {
@@ -475,6 +500,28 @@
       if (!f.is_private.disabled) payload.is_private = f.is_private.checked;
       if (payload.repeat !== "none" && !payload.due_date) payload.due_date = isoDate(startOfToday());
       if (payload.due_time && !payload.due_date) payload.due_date = isoDate(startOfToday());
+
+      if (!payload.title) throw new Error("Bitte eintragen, was zu tun ist.");
+
+      // Neue Aufgabe anlegen
+      if (!td.editingId) {
+        if (!payload.tag_ids) delete payload.tag_ids;
+        if (payload.is_private === undefined) payload.is_private = false;
+        const { data, error } = await sb.from("todos").insert({ household_id: state.household.id, ...payload }).select().single();
+        if (error) throw error;
+        upsertLocal(data);
+        const pending = td.pendingFiles;
+        td.pendingFiles = [];
+        td.editingId = data.id;
+        if (pending.length) await uploadFiles(pending);
+        closeSheets();
+        render();
+        $("#form-add-todo").text.value = "";
+        if (data.assigned_to && data.assigned_to !== state.session.user.id && PP.notify) PP.notify.task(data.id);
+        toast("Aufgabe angelegt" + (data.due_date ? " – fällig: " + dueLabel(data.due_date) : "") + ".");
+        if (!data.due_time && PP.planner) PP.planner.suggestFor(data);
+        return;
+      }
 
       const before = td.items.find(x => x.id === td.editingId);
       const prevAssignee = before ? before.assigned_to : null;
@@ -577,6 +624,16 @@
   }
 
   function renderFiles() {
+    if (!td.editingId) {
+      $("#todo-files").innerHTML = td.pendingFiles.length
+        ? td.pendingFiles.map((f, i) => `<li class="file-row">
+            <span class="file-open"><span class="file-icon">${fileIcon(f.type || "")}</span>
+            <span class="file-text"><span class="file-name">${escapeHtml(f.name)}</span><span class="file-size">${sizeText(f.size)} · wird beim Anlegen hochgeladen</span></span></span>
+            <button type="button" class="icon-btn small" data-del-pending="${i}" aria-label="Anlage entfernen">✕</button>
+          </li>`).join("")
+        : `<li class="muted small">Noch keine Anlagen.</li>`;
+      return;
+    }
     const files = filesOf(td.editingId);
     $("#todo-files").innerHTML = files.length
       ? files.map(f => `<li class="file-row">
@@ -638,10 +695,21 @@
   $("#todo-file-input").addEventListener("change", e => {
     const files = [...e.target.files];
     e.target.value = "";
-    if (files.length) uploadFiles(files);
+    if (!files.length) return;
+    if (!td.editingId) {
+      for (const file of files) {
+        if (file.size > 25 * 1024 * 1024) toast(`„${file.name}“ ist größer als 25 MB.`, true);
+        else td.pendingFiles.push(file);
+      }
+      renderFiles();
+      return;
+    }
+    uploadFiles(files);
   });
 
   $("#todo-files").addEventListener("click", async e => {
+    const pendBtn = e.target.closest("[data-del-pending]");
+    if (pendBtn) { td.pendingFiles.splice(+pendBtn.dataset.delPending, 1); renderFiles(); return; }
     const openBtn = e.target.closest("[data-open-file]");
     const delBtn = e.target.closest("[data-del-file]");
     const files = filesOf(td.editingId);
@@ -674,6 +742,7 @@
     if (!t) return;
     if (t.dataset.toggle) { toggle(t.dataset.toggle); return; }
     if (t.dataset.edit) { openEdit(t.dataset.edit); return; }
+    if (t.id === "btn-todo-full") { openNew($("#form-add-todo").text.value).catch(err => toast(translateError(err), true)); return; }
     if (t.id === "btn-todo-plan") { if (PP.planner) PP.planner.open(); return; }
     if (t.dataset.todoTag !== undefined) {
       td.tagFilter = t.dataset.todoTag;
@@ -695,7 +764,7 @@
     e.preventDefault();
     const input = e.target.text;
     const text = input.value;
-    if (!text.trim()) return;
+    if (!text.trim()) { openNew(); return; }
     input.value = "";
     addFromInput(text).then(ok => { if (!ok) input.value = text; }).catch(err => {
       input.value = text;

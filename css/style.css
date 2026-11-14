@@ -1290,3 +1290,7 @@ article.wiki-content { background: var(--surface); border-radius: var(--radius);
 .bd-import-row input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--berry); }
 .bd-import-row.dupe { opacity: .6; }
 .bd-import-list { max-height: 45vh; overflow-y: auto; margin-bottom: 12px; }
+
+/* Aufgaben: Knopf „mit allen Angaben anlegen“ */
+.add-btn.add-btn-full { background: var(--surface); color: var(--green); border: 1.5px solid var(--green); }
+@media (prefers-color-scheme: dark) { .add-bar-green .add-btn.add-btn-full { color: var(--green); } }

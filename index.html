@@ -246,13 +246,16 @@
       <form id="form-add-todo" class="add-bar add-bar-green" autocomplete="off">
         <input type="text" name="text" maxlength="300"
                placeholder="Neue Aufgabe, z. B. Zahnarzt anrufen morgen" enterkeyhint="done" aria-label="Neue Aufgabe">
+        <button type="button" class="add-btn add-btn-full" id="btn-todo-full" aria-label="Mit allen Angaben anlegen" title="Mit allen Angaben anlegen">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        </button>
         <button type="submit" class="add-btn" aria-label="Hinzufügen">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </form>
       <div class="chips" id="todo-tags"></div>
       <div id="todo-suggest" class="todo-suggest" hidden></div>
-      <p class="input-hint">Tipp: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>um 15 Uhr</b>, <b>für 1 Std</b>, <b>@Name</b>, <b>#Tag</b>, <b>!</b> für wichtig, <b>#privat</b></p>
+      <p class="input-hint">Tipp: Das Blatt-Symbol öffnet das Fenster mit allen Angaben. Beim schnellen Eintippen erkannt: <b>morgen</b>, <b>Freitag</b>, <b>15.12.</b>, <b>jeden Dienstag</b>, <b>um 15 Uhr</b>, <b>für 1 Std</b>, <b>@Name</b>, <b>#Tag</b>, <b>!</b> für wichtig, <b>#privat</b></p>
 
       <div id="todo-items"></div>
       <div id="todo-done" class="done-section"></div>
@@ -510,10 +513,10 @@
     </form>
   </div>
 
-  <div id="sheet-todo" class="sheet" hidden role="dialog" aria-label="Aufgabe bearbeiten">
+  <div id="sheet-todo" class="sheet" hidden role="dialog" aria-label="Aufgabe">
     <div class="sheet-handle"></div>
     <div class="panel-head">
-      <h2>Aufgabe</h2>
+      <h2 id="todo-sheet-title">Aufgabe</h2>
       <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
     </div>
     <form id="form-todo" class="form">
@@ -581,7 +584,7 @@
         <input type="file" id="todo-file-input" multiple hidden>
       </div>
       <p class="muted small" id="todo-created"></p>
-      <button type="submit" class="btn btn-primary">Speichern</button>
+      <button type="submit" class="btn btn-primary" id="btn-save-todo">Speichern</button>
       <button type="button" class="link danger-link" id="btn-delete-todo">Aufgabe löschen</button>
     </form>
   </div>
