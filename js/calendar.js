@@ -551,7 +551,7 @@
       $("#ev-series-times").hidden = !series;
       $("#ev-cal-row").hidden = true;      // Kalender wechseln geht nicht
       $("#ev-repeat-row").hidden = true;
-      $("#ev-repeat-hint").hidden = true;
+      $("#ev-repeat-panel").hidden = true;
     } else {
       fillReadonly(ev);
     }
@@ -600,7 +600,7 @@
     $("#ev-cal-row").hidden = false;
     $("#ev-repeat-row").hidden = false;
     $("#btn-delete-event").hidden = true;
-    $("#ev-repeat-hint").hidden = true;
+    rpEvent.set({ kind: "none" });
     $("#ev-series-hint").hidden = true;
 
     renderEventPickers();
@@ -710,7 +710,8 @@
       start_time: f.start_time.value,
       end_time: f.end_time.value,
       tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Berlin",
-      repeat: f.repeat.value,
+      repeat: f.repeat.value === "custom" ? "none" : f.repeat.value,
+      rrule: PP.repeat.toRRule(rpEvent.get(), f.start_date.value),
       alarm: f.alarm.value
     };
   }
@@ -855,24 +856,16 @@
     pickPlace(+li.dataset.place);
   });
 
-  // Hinweis bei „Werktags“: wann die Serie läuft (und ob sie erst am Montag beginnt)
-  function updateRepeatHint() {
-    const f = $("#form-event");
-    const hint = $("#ev-repeat-hint");
-    if ($("#ev-repeat-row").hidden || f.repeat.value !== "weekdays" || !f.start_date.value) { hint.hidden = true; return; }
-    const time = f.all_day.checked ? "ganztägig" : `${f.start_time.value}–${f.end_time.value} Uhr`;
-    const d = new Date(f.start_date.value + "T12:00:00");
-    const add = d.getDay() === 6 ? 2 : d.getDay() === 0 ? 1 : 0;
-    let text = `🔁 Jeden Montag bis Freitag, ${time}.`;
-    if (add) {
-      d.setDate(d.getDate() + add);
-      text += ` Da der ${longDate(f.start_date.value)} am Wochenende liegt, beginnt die Serie am ${longDate(isoDate(d))}.`;
-    }
-    hint.textContent = text;
-    hint.hidden = false;
-  }
-  $("#form-event").addEventListener("change", updateRepeatHint);
-  $("#form-event").addEventListener("input", updateRepeatHint);
+  // Wiederholung (inkl. „Benutzerdefiniert …“)
+  const rpEvent = PP.repeat.mount({
+    select: $("#form-event").repeat,
+    panel: $("#ev-repeat-panel"),
+    startDate: () => $("#form-event").start_date.value,
+    calendar: true
+  });
+  $("#form-event").addEventListener("change", e => {
+    if (["start_date", "start_time", "end_time", "all_day"].includes(e.target.name)) rpEvent.refresh();
+  });
 
   $("#btn-save-event").addEventListener("click", async () => {
     const ed = cal.editing;
@@ -891,6 +884,7 @@
         return;
       }
 
+      if (ed.mode === "new") rpEvent.validate();
       const p = formPayload();
       if (ed.mode === "new") {
         p.calendar_id = f.calendar_id.value;

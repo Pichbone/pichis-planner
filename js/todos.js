@@ -89,7 +89,15 @@
 
     // Wiederholung
     let m;
-    if (take(new RegExp(B + "(?:jeden werktag|werktags|an werktagen|mo(?:ntags?)?\\s*(?:-|–|bis)\\s*fr(?:eitags?)?)" + E, "i"))) out.repeat = "weekdays";
+    // „alle 2 Wochen“, „alle drei Tage“ …
+    const NUMW = { zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10, elf: 11, zwölf: 12 };
+    let rpm;
+    if ((rpm = take(new RegExp(B + "alle (\\d{1,3}|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf) (tage?|wochen?|monate?|jahre?)" + E, "i")))) {
+      const n = NUMW[rpm[1].toLowerCase()] || parseInt(rpm[1], 10);
+      out.repeat = { t: "daily", w: "weekly", m: "monthly", j: "yearly" }[rpm[2][0].toLowerCase()];
+      if (n > 1) out.repeat_interval = Math.min(999, n);
+    }
+    else if (take(new RegExp(B + "(?:jeden werktag|werktags|an werktagen|mo(?:ntags?)?\\s*(?:-|–|bis)\\s*fr(?:eitags?)?)" + E, "i"))) out.repeat = "weekdays";
     else if (take(new RegExp(B + "(?:jeden tag|täglich)" + E, "i"))) out.repeat = "daily";
     else if ((m = take(new RegExp(B + "jeden (" + WEEKDAYS.join("|") + ")" + E, "i")))) {
       out.repeat = "weekly";
@@ -245,7 +253,7 @@
     const extras = [];
     if (data.due_date) extras.push(dueLabel(data.due_date));
     if (data.assigned_to) extras.push("für " + memberName(data.assigned_to));
-    if (data.repeat !== "none") extras.push(REPEAT_LABEL[data.repeat]);
+    if (data.repeat !== "none") extras.push(repeatText(data).toLowerCase());
     if (data.is_private) extras.push("privat");
     if (data.tag_ids && data.tag_ids.length) extras.push(data.tag_ids.map(id => (td.tags.find(t => t.id === id) || {}).name).filter(Boolean).map(n => "#" + n).join(" "));
     if (extras.length) toast("Aufgabe angelegt: " + extras.join(", "));
@@ -355,7 +363,7 @@
     }
     const nFiles = filesOf(item.id).length;
     if (nFiles) meta.push(`📎 ${nFiles}`);
-    if (item.repeat !== "none") meta.push("🔁 " + REPEAT_LABEL[item.repeat]);
+    if (item.repeat !== "none") meta.push("🔁 " + escapeHtml(repeatText(item)));
     if (item.is_private) meta.push("🔒 privat");
     if (item.notes) meta.push(escapeHtml(item.notes.split("\n")[0]).slice(0, 80));
     const tags = (item.tag_ids || []).map(id => td.tags.find(t => t.id === id)).filter(Boolean);
@@ -464,7 +472,7 @@
     f.assigned_to.innerHTML = `<option value="">Niemand</option>` + state.members
       .map(m => `<option value="${m.id}">${escapeHtml(m.name)}${m.id === me ? " (du)" : ""}</option>`).join("");
     f.assigned_to.value = item.assigned_to || "";
-    f.repeat.value = item.repeat;
+    rpTodo.set(PP.repeat.fromTodo(item));
     f.priority.checked = item.priority === 1;
     f.is_private.checked = !!item.is_private;
     td.draftTags = new Set(item.tag_ids || []);
@@ -480,6 +488,18 @@
     if (isNew) setTimeout(() => { f.title.focus(); f.title.setSelectionRange(f.title.value.length, f.title.value.length); }, 80);
   }
 
+  // Wiederholung mit „Benutzerdefiniert …“
+  const rpTodo = PP.repeat.mount({
+    select: $("#form-todo").repeat,
+    panel: $("#todo-repeat-panel"),
+    startDate: () => $("#form-todo").due_date.value || isoDate(startOfToday())
+  });
+  $("#form-todo").due_date.addEventListener("change", () => rpTodo.refresh());
+
+  function repeatText(item) {
+    return PP.repeat.describe(PP.repeat.fromTodo(item), item.due_date || isoDate(startOfToday()));
+  }
+
   $("#form-todo").addEventListener("submit", e => {
     e.preventDefault();
     const f = e.target;
@@ -491,9 +511,19 @@
         due_time: f.due_time.value || null,
         duration_minutes: f.duration_minutes.value ? +f.duration_minutes.value : null,
         assigned_to: f.assigned_to.value || null,
-        repeat: f.repeat.value,
         priority: f.priority.checked ? 1 : 0
       };
+      // Wiederholung (Zusatzfelder nur senden, wenn genutzt – läuft so auch vor Schritt 20)
+      rpTodo.validate();
+      const rp = PP.repeat.toTodo(rpTodo.get());
+      const prev = td.items.find(x => x.id === td.editingId);
+      payload.repeat = rp.repeat;
+      if (rp.repeat_interval > 1 || rp.repeat_days.length || rp.repeat_until ||
+          (prev && ((prev.repeat_interval || 1) > 1 || (prev.repeat_days || []).length || prev.repeat_until))) {
+        payload.repeat_interval = rp.repeat_interval;
+        payload.repeat_days = rp.repeat_days;
+        payload.repeat_until = rp.repeat_until;
+      }
       const tagIds = [...td.draftTags].filter(id => td.tags.some(t => t.id === id));
       const before0 = td.items.find(x => x.id === td.editingId);
       if (tagIds.length || (before0 && before0.tag_ids && before0.tag_ids.length)) payload.tag_ids = tagIds;

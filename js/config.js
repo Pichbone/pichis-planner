@@ -4,5 +4,5 @@
 window.PP_CONFIG = {
   SUPABASE_URL: "https://pgevrbsvyinowxrpxgpp.supabase.co",
   SUPABASE_KEY: "sb_publishable_q2ZVeMgvJyqgE_vty9zXJA_hk_vCyjm",
-  APP_VERSION: "0.18.4"
+  APP_VERSION: "0.19.0"
 };
