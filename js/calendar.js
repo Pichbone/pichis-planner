@@ -549,6 +549,7 @@
       $("#ev-series-times").hidden = !series;
       $("#ev-cal-row").hidden = true;      // Kalender wechseln geht nicht
       $("#ev-repeat-row").hidden = true;
+      $("#ev-repeat-hint").hidden = true;
     } else {
       fillReadonly(ev);
     }
@@ -595,6 +596,7 @@
     $("#ev-cal-row").hidden = false;
     $("#ev-repeat-row").hidden = false;
     $("#btn-delete-event").hidden = true;
+    $("#ev-repeat-hint").hidden = true;
     $("#ev-series-hint").hidden = true;
 
     renderEventPickers();
@@ -708,6 +710,25 @@
       alarm: f.alarm.value
     };
   }
+
+  // Hinweis bei „Werktags“: wann die Serie läuft (und ob sie erst am Montag beginnt)
+  function updateRepeatHint() {
+    const f = $("#form-event");
+    const hint = $("#ev-repeat-hint");
+    if ($("#ev-repeat-row").hidden || f.repeat.value !== "weekdays" || !f.start_date.value) { hint.hidden = true; return; }
+    const time = f.all_day.checked ? "ganztägig" : `${f.start_time.value}–${f.end_time.value} Uhr`;
+    const d = new Date(f.start_date.value + "T12:00:00");
+    const add = d.getDay() === 6 ? 2 : d.getDay() === 0 ? 1 : 0;
+    let text = `🔁 Jeden Montag bis Freitag, ${time}.`;
+    if (add) {
+      d.setDate(d.getDate() + add);
+      text += ` Da der ${longDate(f.start_date.value)} am Wochenende liegt, beginnt die Serie am ${longDate(isoDate(d))}.`;
+    }
+    hint.textContent = text;
+    hint.hidden = false;
+  }
+  $("#form-event").addEventListener("change", updateRepeatHint);
+  $("#form-event").addEventListener("input", updateRepeatHint);
 
   $("#btn-save-event").addEventListener("click", async () => {
     const ed = cal.editing;
