@@ -52,6 +52,7 @@
     if (/Email not confirmed/i.test(m)) return "Bitte bestätige zuerst deine E-Mail-Adresse (Link in der Mail).";
     if (/already registered|already exists/i.test(m)) return "Diese E-Mail-Adresse ist bereits registriert.";
     if (/Password should be at least/i.test(m)) return "Das Passwort muss mindestens 8 Zeichen haben.";
+    if (/remind_at|remind_offset|reminded_at/.test(m)) return "Für Erinnerungen bitte zuerst das SQL aus Schritt 25 in Supabase ausführen.";
     if (/repeat_interval|repeat_days|repeat_until/.test(m)) return "Für benutzerdefinierte Wiederholungen bitte zuerst das SQL aus Schritt 20 in Supabase ausführen.";
     if (/rate limit|too many/i.test(m)) return "Zu viele Versuche. Bitte warte kurz und versuche es erneut.";
     if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Keine Verbindung. Bitte Internet prüfen.";

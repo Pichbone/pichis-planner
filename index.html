@@ -613,6 +613,26 @@
           </select>
         </label>
       </div>
+      <div class="form-row form-row-even todo-remind-row">
+        <label>Erinnerung
+          <select name="remind">
+            <option value="">Keine</option>
+            <option value="0">Zur Fälligkeit</option>
+            <option value="15">15 Min. vorher</option>
+            <option value="30">30 Min. vorher</option>
+            <option value="60">1 Std. vorher</option>
+            <option value="120">2 Std. vorher</option>
+            <option value="1440">1 Tag vorher</option>
+            <option value="2880">2 Tage vorher</option>
+            <option value="10080">1 Woche vorher</option>
+            <option value="custom">Eigene Zeit …</option>
+          </select>
+        </label>
+        <label id="todo-remind-custom" hidden>Erinnern am
+          <input type="datetime-local" name="remind_custom" step="300">
+        </label>
+      </div>
+      <p class="muted small" id="todo-remind-hint" hidden></p>
       <label>Zuständig
         <select name="assigned_to"></select>
       </label>

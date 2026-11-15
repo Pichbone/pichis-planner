@@ -364,6 +364,7 @@
     const nFiles = filesOf(item.id).length;
     if (nFiles) meta.push(`📎 ${nFiles}`);
     if (item.repeat !== "none") meta.push("🔁 " + escapeHtml(repeatText(item)));
+    if (item.remind_at && !item.reminded_at && !item.is_done) meta.push("⏰ " + escapeHtml(remindText(item.remind_at)));
     if (item.is_private) meta.push("🔒 privat");
     if (item.notes) meta.push(escapeHtml(item.notes.split("\n")[0]).slice(0, 80));
     const tags = (item.tag_ids || []).map(id => td.tags.find(t => t.id === id)).filter(Boolean);
@@ -473,6 +474,7 @@
       .map(m => `<option value="${m.id}">${escapeHtml(m.name)}${m.id === me ? " (du)" : ""}</option>`).join("");
     f.assigned_to.value = item.assigned_to || "";
     rpTodo.set(PP.repeat.fromTodo(item));
+    setRemindUi(item);
     f.priority.checked = item.priority === 1;
     f.is_private.checked = !!item.is_private;
     td.draftTags = new Set(item.tag_ids || []);
@@ -495,6 +497,83 @@
     startDate: () => $("#form-todo").due_date.value || isoDate(startOfToday())
   });
   $("#form-todo").due_date.addEventListener("change", () => rpTodo.refresh());
+
+  // ---------- Erinnerung ----------
+  const pad2 = n => String(n).padStart(2, "0");
+  function localInput(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+
+  function dueMoment(dueDate, dueTime) {
+    if (!dueDate) return null;
+    const [y, m, d] = dueDate.split("-").map(Number);
+    const [hh, mm] = (dueTime ? String(dueTime).slice(0, 5) : "09:00").split(":").map(Number);
+    return new Date(y, m - 1, d, hh, mm);
+  }
+
+  function remindFromForm(f, payload) {
+    const v = f.remind.value;
+    if (!v) return { remind_offset: null, remind_at: null };
+    if (v === "custom") {
+      if (!f.remind_custom.value) throw new Error("Bitte Datum und Uhrzeit für die Erinnerung wählen.");
+      return { remind_offset: null, remind_at: new Date(f.remind_custom.value).toISOString() };
+    }
+    const due = dueMoment(payload.due_date, payload.due_time);
+    if (!due) throw new Error("Für eine Erinnerung braucht die Aufgabe ein Fälligkeitsdatum – oder wähle „Eigene Zeit …“.");
+    return { remind_offset: +v, remind_at: new Date(due.getTime() - +v * 60000).toISOString() };
+  }
+
+  function setRemindUi(item) {
+    const f = $("#form-todo");
+    const sel = f.remind;
+    if (item && item.remind_offset != null && [...sel.options].some(o => o.value === String(item.remind_offset))) sel.value = String(item.remind_offset);
+    else if (item && item.remind_at) { sel.value = "custom"; f.remind_custom.value = localInput(new Date(item.remind_at)); }
+    else sel.value = "";
+    updateRemindHint();
+  }
+
+  async function updateRemindHint() {
+    const f = $("#form-todo");
+    const v = f.remind.value;
+    $("#todo-remind-custom").hidden = v !== "custom";
+    if (v === "custom" && !f.remind_custom.value) {
+      const due = dueMoment(f.due_date.value, f.due_time.value) || new Date(Date.now() + 3600000);
+      f.remind_custom.value = localInput(due);
+    }
+    const hint = $("#todo-remind-hint");
+    let text = "";
+    if (v && v !== "custom") {
+      const due = dueMoment(f.due_date.value, f.due_time.value);
+      if (!due) text = "Bitte ein Fälligkeitsdatum wählen – die Erinnerung richtet sich danach.";
+      else {
+        const at = new Date(due.getTime() - +v * 60000);
+        text = `⏰ Mitteilung ${remindText(at.toISOString())}` + (f.due_time.value ? "" : " (ohne Uhrzeit gilt 9:00 Uhr als Fälligkeit)");
+      }
+    }
+    if (v && !(await pushOn())) text += (text ? " · " : "") + "Mitteilungen sind auf diesem Gerät noch nicht eingeschaltet (Personen-Symbol → „Mitteilungen aufs Handy“).";
+    hint.textContent = text;
+    hint.hidden = !text;
+  }
+
+  async function pushOn() {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+      // nicht ewig warten, falls kein Service Worker läuft
+      const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 1500))]);
+      return !!(reg && await reg.pushManager.getSubscription());
+    } catch { return false; }
+  }
+
+  function remindText(iso) {
+    const d = new Date(iso);
+    const day = isoDate(d);
+    const t = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const diff = dayDiff(day);
+    if (diff === 0) return `heute ${t}`;
+    if (diff === 1) return `morgen ${t}`;
+    return `am ${d.getDate()}.${d.getMonth() + 1}. ${t}`;
+  }
+
+  ["remind", "remind_custom", "due_date", "due_time"].forEach(n =>
+    $("#form-todo")[n].addEventListener("change", updateRemindHint));
 
   function repeatText(item) {
     return PP.repeat.describe(PP.repeat.fromTodo(item), item.due_date || isoDate(startOfToday()));
@@ -530,6 +609,9 @@
       if (!f.is_private.disabled) payload.is_private = f.is_private.checked;
       if (payload.repeat !== "none" && !payload.due_date) payload.due_date = isoDate(startOfToday());
       if (payload.due_time && !payload.due_date) payload.due_date = isoDate(startOfToday());
+      // Erinnerung (Felder nur senden, wenn genutzt – läuft so auch vor Schritt 25)
+      const rem = remindFromForm(f, payload);
+      if (rem.remind_at || (prev && (prev.remind_at || prev.remind_offset != null))) Object.assign(payload, rem);
 
       if (!payload.title) throw new Error("Bitte eintragen, was zu tun ist.");
 
