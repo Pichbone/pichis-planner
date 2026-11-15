@@ -1403,3 +1403,4 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .bg-dim-row { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: .9rem; font-weight: 500; }
 .bg-dim-row span { display: flex; justify-content: space-between; }
 .bg-dim-row input { width: 100%; accent-color: var(--green); }
+.media-upcoming { display: block; margin: 8px 0 4px; }

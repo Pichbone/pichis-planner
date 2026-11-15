@@ -13,6 +13,7 @@
     song:  { label: "Song",  plural: "Songs",  icon: "🎵", done: "gehört" },
     album: { label: "Album", plural: "Alben",  icon: "💿", done: "gehört" },
     film:  { label: "Film",  plural: "Filme",  icon: "🎬", done: "gesehen" },
+    kino:  { label: "Kino",  plural: "Kino",   icon: "🍿", done: "gesehen" },
     serie: { label: "Serie", plural: "Serien", icon: "📺", done: "gesehen" },
     buch:  { label: "Buch",  plural: "Bücher", icon: "📚", done: "gelesen" },
     link:  { label: "Link",  plural: "Links",  icon: "🔗", done: "erledigt" }
@@ -109,16 +110,20 @@
     const today = todayIso();
     let when = "";
     if (it.release_date) {
-      if (it.release_date > today) {
-        const days = Math.round((new Date(it.release_date) - new Date(today)) / 86400000);
-        when = `<span class="media-soon">erscheint ${days === 1 ? "morgen" : days <= 14 ? `in ${days} Tagen` : "am " + dateText(it.release_date)}</span>`;
-      } else if (it.release_date === today) {
-        when = `<span class="media-soon">erscheint heute</span>`;
+      const kino = it.type === "kino";
+      const days = Math.round((new Date(it.release_date) - new Date(today)) / 86400000);
+      if (days > 0) {
+        const rel = days === 1 ? "morgen" : days <= 14 ? `in ${days} Tagen` : null;
+        when = `<span class="media-soon">${kino
+          ? (rel ? `im Kino ${days === 1 ? "ab morgen" : rel}` : "Kinostart " + dateText(it.release_date))
+          : (rel ? `erscheint ${rel}` : "erscheint am " + dateText(it.release_date))}</span>`;
+      } else if (days === 0) {
+        when = `<span class="media-soon">${kino ? "heute Kinostart 🍿" : "erscheint heute"}</span>`;
       } else {
-        when = dateText(it.release_date);
+        when = (kino ? "Kinostart " : "") + dateText(it.release_date);
       }
     }
-    const tall = ["film", "serie", "buch"].includes(it.type);
+    const tall = ["film", "kino", "serie", "buch"].includes(it.type);
     const img = safeUrl(it.image_url)
       ? `<img src="${escapeHtml(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="media-cover${tall ? " tall" : ""}">`
       : `<span class="media-cover media-cover-empty${tall ? " tall" : ""}">${t.icon}</span>`;
@@ -208,6 +213,7 @@
     f.q.placeholder = isLink ? "Adresse einfügen, z. B. https://…" : `${TYPES[type].label} suchen, z. B. Titel oder Name`;
     f.q.type = isLink ? "url" : "search";
     $("#btn-media-search").textContent = isLink ? "Infos laden" : "Suchen";
+    $("#btn-media-upcoming").hidden = type !== "kino";
     $("#media-results").innerHTML = "";
   }
 
@@ -270,7 +276,13 @@
         return;
       }
       const data = await callMedia("search", { type: md.addType, q });
+      showResults(data);
+    });
+  });
+
+  function showResults(data, heading = "") {
       lastResults = data.results || [];
+      const when = r => !r.release_date ? "" : md.addType === "kino" ? "Kinostart " + dateText(r.release_date) : r.release_date.slice(0, 4);
       const sourceName = { apple: "Apple", tmdb: "TMDB", google_books: "Google Books" }[data.source] || "";
       $("#media-results").innerHTML = lastResults.length
         ? `<ul class="result-list">${lastResults.map((r, i) => `
@@ -278,12 +290,26 @@
               ${safeUrl(r.image_url) ? `<img src="${escapeHtml(r.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="result-noimg">${TYPES[md.addType].icon}</span>`}
               <span class="result-text">
                 <span class="result-title">${escapeHtml(r.title)}</span>
-                <span class="result-sub">${escapeHtml([r.creator, r.release_date ? r.release_date.slice(0, 4) : "", r.genre].filter(Boolean).join(" · "))}</span>
+                <span class="result-sub">${escapeHtml([r.creator, when(r), r.genre].filter(Boolean).join(" · "))}</span>
               </span>
             </button></li>`).join("")}</ul>
            ${sourceName ? `<p class="muted small">Daten von ${sourceName}</p>` : ""}`
         : `<p class="muted small">Nichts gefunden. Du kannst die Angaben unten auch selbst eintragen.</p>`;
-    });
+      if (heading && lastResults.length) $("#media-results").insertAdjacentHTML("afterbegin", `<h3 class="sheet-sub">${heading}</h3>`);
+  }
+
+  // Demnächst im Kino (Deutschland)
+  $("#btn-media-upcoming").addEventListener("click", async () => {
+    const btn = $("#btn-media-upcoming");
+    btn.disabled = true;
+    $("#media-results").innerHTML = `<p class="muted small">Kinostarts werden geladen …</p>`;
+    try {
+      showResults(await callMedia("upcoming", {}), "🎟️ Demnächst im Kino");
+    } catch (err) {
+      $("#media-results").innerHTML = `<p class="muted small">${escapeHtml(err.message || "Fehler")}</p>`;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   $("#media-results").addEventListener("click", e => {
