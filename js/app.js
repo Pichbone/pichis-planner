@@ -191,7 +191,8 @@
     "mail": { id: "mailin", title: "Eingang", module: "mailin" },
     "wiki": { id: "wiki", title: "Wiki", module: "wiki" },
     "geburtstage": { id: "birthdays", title: "Geburtstage", module: "birthdays" },
-    "meintag": { id: "myday", title: "Mein Tag", module: "myday" }
+    "meintag": { id: "myday", title: "Mein Tag", module: "myday" },
+    "news": { id: "news", title: "News", module: "news" }
   };
   let activeView = null;
 

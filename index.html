@@ -130,7 +130,7 @@
         </button>
         <img src="/icons/icon-192.png" alt="" class="logo-small" id="topbar-logo">
         <div>
-          <div class="eyebrow" data-household-name></div>
+          <div class="eyebrow"><span data-household-name></span><button class="weather-chip" id="weather-chip" type="button" hidden></button></div>
           <div class="greeting" id="greeting"></div>
         </div>
       </div>
@@ -186,6 +186,11 @@
           <div class="tile-icon">📝</div>
           <div class="tile-name">Notizen</div>
           <div class="tile-status" id="tile-note-status">Öffnen</div>
+        </a>
+        <a class="tile tile-active tile-news" href="#/news">
+          <div class="tile-icon">🌍</div>
+          <div class="tile-name">News</div>
+          <div class="tile-status">Aus aller Welt</div>
         </a>
         <a class="tile tile-active tile-sea" href="#/meintag">
           <div class="tile-icon">💭</div>
@@ -353,6 +358,15 @@
 
       <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
       <div id="jn-items"></div>
+     </div>
+
+     <!-- ===== News ===== -->
+     <div id="view-news" class="view" hidden>
+      <div class="news-bar">
+        <div class="chips" id="news-cats"></div>
+        <button class="icon-btn" id="btn-news-refresh" aria-label="Neu laden" title="Neu laden">↻</button>
+      </div>
+      <div id="news-items"></div>
      </div>
 
      <!-- ===== Mein Tag ===== -->
@@ -759,6 +773,16 @@
   <div id="jn-viewer" class="jn-viewer" hidden role="dialog" aria-label="Bild">
     <img id="jn-viewer-img" alt="">
     <span class="jn-viewer-close">✕</span>
+  </div>
+
+  <!-- Wetter -->
+  <div id="sheet-weather" class="sheet" hidden role="dialog" aria-label="Wetter">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="weather-title">Wetter</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="weather-body"></div>
   </div>
 
   <!-- Geburtstag -->
@@ -1364,5 +1388,7 @@
   <script src="/js/wiki.js"></script>
   <script src="/js/birthdays.js"></script>
   <script src="/js/myday.js"></script>
+  <script src="/js/news.js"></script>
+  <script src="/js/weather.js"></script>
 </body>
 </html>
