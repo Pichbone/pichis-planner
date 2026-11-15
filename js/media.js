@@ -213,7 +213,8 @@
     f.q.placeholder = isLink ? "Adresse einfügen, z. B. https://…" : `${TYPES[type].label} suchen, z. B. Titel oder Name`;
     f.q.type = isLink ? "url" : "search";
     $("#btn-media-search").textContent = isLink ? "Infos laden" : "Suchen";
-    $("#btn-media-upcoming").hidden = type !== "kino";
+    const up = $("#btn-media-upcoming");
+    if (up) up.hidden = type !== "kino";
     $("#media-results").innerHTML = "";
   }
 
@@ -299,7 +300,8 @@
   }
 
   // Demnächst im Kino (Deutschland)
-  $("#btn-media-upcoming").addEventListener("click", async () => {
+  // (Knopf fehlt, falls noch eine ältere index.html geladen ist – dann einfach ohne)
+  if ($("#btn-media-upcoming")) $("#btn-media-upcoming").addEventListener("click", async () => {
     const btn = $("#btn-media-upcoming");
     btn.disabled = true;
     $("#media-results").innerHTML = `<p class="muted small">Kinostarts werden geladen …</p>`;
