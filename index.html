@@ -1321,6 +1321,21 @@
       <button type="button" class="link" id="btn-new-code" hidden>Neuen Code erzeugen</button>
     </div>
 
+    <div class="panel-section" id="bg-settings">
+      <h3>Hintergrundbild</h3>
+      <div class="bg-preview empty" id="bg-preview" aria-hidden="true"><span>Kein Bild</span></div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-small" id="btn-bg-pick">🖼️ Bild wählen</button>
+        <button type="button" class="link danger-link" id="btn-bg-remove" hidden>Entfernen</button>
+      </div>
+      <input type="file" id="bg-file" accept="image/*" hidden>
+      <label class="bg-dim-row" id="bg-dim-row" hidden>
+        <span>Bild abschwächen <b id="bg-dim-value">45 %</b></span>
+        <input type="range" id="bg-dim" min="0" max="90" step="5" value="45">
+      </label>
+      <p class="muted small" id="bg-note"></p>
+    </div>
+
     <div class="panel-section">
       <button type="button" class="btn btn-ghost" data-logout>Abmelden</button>
       <p class="muted small version">Version <span id="app-version"></span></p>
@@ -1334,6 +1349,7 @@
   <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/notify.js"></script>
+  <script src="/js/background.js"></script>
   <script src="/js/repeat.js"></script>
   <script src="/js/shopping.js"></script>
   <script src="/js/todos.js"></script>

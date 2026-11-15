@@ -203,6 +203,7 @@
     PP.route = { base, param: decodeURIComponent(rest.join("/")) };
 
     $$(".view").forEach(v => { v.hidden = v.id !== "view-" + view.id; });
+    document.body.dataset.view = view.id;
     $("#btn-back").hidden = view.id === "home";
     $("#topbar-logo").hidden = view.id !== "home";
     $("#greeting").textContent = view.title || greetingText();

@@ -1376,3 +1376,30 @@ article.wiki-content { background: var(--surface); border-radius: var(--radius);
 .md-day-date { font-weight: 600; font-size: .9rem; }
 .md-day-text { font-size: .85rem; color: var(--muted); }
 .md-reminder { margin-top: 4px; }
+
+/* =========================================================
+   Hintergrundbild (für die ganze Familie)
+   ========================================================= */
+body.has-bg { background: transparent; }
+body.has-bg::before, body.has-bg::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+}
+body.has-bg::before { z-index: -2; background: var(--app-bg-image) center / cover no-repeat, var(--bg); }
+/* Schleier: auf der Startseite wie eingestellt, in den Bereichen etwas kräftiger (Lesbarkeit) */
+body.has-bg::after { background: var(--bg); opacity: var(--app-bg-veil, .45); transition: opacity .25s; }
+body.has-bg:not([data-view="home"])::after { opacity: max(var(--app-bg-veil, .45), .82); }
+body.has-bg .add-bar, body.has-bg .note-toolbar { background: transparent; }
+body.has-bg .add-bar { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+body.has-bg[data-view="home"] .tile { box-shadow: 0 4px 18px rgba(0,0,0,.12); }
+body.has-bg[data-view="home"] .section-title,
+body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var(--bg) 85%, transparent); }
+
+.bg-preview {
+  height: 120px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-2) center / cover no-repeat; display: grid; place-items: center;
+}
+.bg-preview span { display: none; color: var(--muted); font-size: .85rem; }
+.bg-preview.empty span { display: inline; }
+.bg-dim-row { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: .9rem; font-weight: 500; }
+.bg-dim-row span { display: flex; justify-content: space-between; }
+.bg-dim-row input { width: 100%; accent-color: var(--green); }
