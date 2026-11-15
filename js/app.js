@@ -190,7 +190,8 @@
     "tagebuch": { id: "journal", title: "Tagebuch", module: "journal" },
     "mail": { id: "mailin", title: "Eingang", module: "mailin" },
     "wiki": { id: "wiki", title: "Wiki", module: "wiki" },
-    "geburtstage": { id: "birthdays", title: "Geburtstage", module: "birthdays" }
+    "geburtstage": { id: "birthdays", title: "Geburtstage", module: "birthdays" },
+    "meintag": { id: "myday", title: "Mein Tag", module: "myday" }
   };
   let activeView = null;
 

@@ -187,6 +187,11 @@
           <div class="tile-name">Notizen</div>
           <div class="tile-status" id="tile-note-status">Öffnen</div>
         </a>
+        <a class="tile tile-active tile-sea" href="#/meintag">
+          <div class="tile-icon">💭</div>
+          <div class="tile-name">Mein Tag</div>
+          <div class="tile-status" id="tile-md-status">Nur für dich</div>
+        </a>
         <a class="tile tile-active tile-rose" href="#/tagebuch">
           <div class="tile-icon">📔</div>
           <div class="tile-name">Tagebuch</div>
@@ -348,6 +353,32 @@
 
       <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
       <div id="jn-items"></div>
+     </div>
+
+     <!-- ===== Mein Tag ===== -->
+     <div id="view-myday" class="view" hidden>
+      <div class="md-head">
+        <p class="md-date" id="md-date"></p>
+        <a href="#/meintag" class="link md-back" id="md-back-today" hidden>Zu heute ›</a>
+      </div>
+      <div class="md-msg md-ai md-opener">
+        <span class="md-who">✨</span>
+        <div class="md-bubble"><p id="md-question"></p></div>
+      </div>
+      <div id="md-thread"></div>
+      <form id="form-md" class="md-composer" autocomplete="off">
+        <textarea id="md-input" rows="3" maxlength="6000" aria-label="Was dich beschäftigt hat"></textarea>
+        <div class="md-composer-row">
+          <label class="switch switch-sm"><input type="checkbox" id="md-thorough"><span class="small">Gründlicher</span></label>
+          <button type="submit" class="btn btn-primary md-send" id="md-send">Senden</button>
+        </div>
+      </form>
+      <div class="md-actions" id="md-actions" hidden>
+        <button type="button" class="link" data-act="journal">📔 Meine Worte ins Tagebuch</button>
+        <button type="button" class="link danger-link" data-act="delete">Gespräch löschen</button>
+      </div>
+      <p class="muted small md-privacy">🔒 Nur für dich – auch die Familie sieht nichts. Zum Antworten wird dein Text an Claude (Anthropic) geschickt.</p>
+      <div id="md-history"></div>
      </div>
 
      <!-- ===== Geburtstage ===== -->
@@ -1308,5 +1339,6 @@
   <script src="/js/mailin.js"></script>
   <script src="/js/wiki.js"></script>
   <script src="/js/birthdays.js"></script>
+  <script src="/js/myday.js"></script>
 </body>
 </html>
