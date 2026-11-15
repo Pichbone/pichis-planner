@@ -250,6 +250,7 @@
         <button class="chip" data-filter="mine">Für mich</button>
         <button class="chip" data-filter="private">🔒 Privat</button>
         <span class="spacer"></span>
+        <button class="chip" id="btn-todo-import" title="Aufgaben aus ICS-Datei importieren" aria-label="Aufgaben aus ICS-Datei importieren">📥</button>
         <button class="chip chip-plan" id="btn-todo-plan">✨ Planen</button>
       </div>
 
@@ -775,6 +776,55 @@
     <span class="jn-viewer-close">✕</span>
   </div>
 
+  <!-- ICS-Import -->
+  <div id="sheet-ics" class="sheet sheet-tall" hidden role="dialog" aria-label="ICS-Datei importieren">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>📥 ICS importieren</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="ics-step1">
+      <p>Wähle eine Kalender-Datei (<b>.ics</b>) – zum Beispiel eine Termineinladung, einen exportierten Kalender aus Outlook oder Google oder eine Aufgabenliste.</p>
+      <label class="btn btn-primary btn-block ics-file-btn" id="ics-file-label">
+        <span id="ics-file-text">📂 ICS-Datei auswählen</span>
+        <input type="file" id="ics-file" accept=".ics,.ical,.ifb,.icalendar,text/calendar" hidden>
+      </label>
+      <p class="muted small">Du siehst erst eine Vorschau und entscheidest dann, was übernommen wird. Teilnehmer aus Einladungen werden nicht übernommen – es werden also keine Einladungen verschickt.</p>
+    </div>
+    <div id="ics-step2" hidden>
+      <p class="muted small" id="ics-summary"></p>
+      <div class="seg ics-target" role="radiogroup" aria-label="Übernehmen als">
+        <label><input type="radio" name="ics-target" value="events"><span>📅 Termine in iCloud</span></label>
+        <label><input type="radio" name="ics-target" value="todos"><span>✅ Aufgaben</span></label>
+      </div>
+      <div id="ics-events-opts" class="form ics-opts">
+        <label>In Kalender
+          <select id="ics-calendar"></select>
+        </label>
+        <p class="muted small">Die Termine erscheinen danach auch auf iPhone und Mac. Schon vorhandene Termine (gleiche Kennung) werden übersprungen.</p>
+      </div>
+      <div id="ics-todos-opts" class="form ics-opts" hidden>
+        <label class="switch" id="ics-with-events-row"><input type="checkbox" id="ics-with-events"><span>Auch Termine als Aufgaben übernehmen</span></label>
+        <label>Zuständig
+          <select id="ics-assigned"></select>
+        </label>
+        <div>
+          <span class="field-label">Tag für alle</span>
+          <div class="chip-wrap" id="ics-tags"></div>
+        </div>
+        <label class="switch"><input type="checkbox" id="ics-cats" checked><span>Kategorien aus der Datei als Tags übernehmen</span></label>
+        <label class="switch"><input type="checkbox" id="ics-private"><span>🔒 Privat (nur für mich)</span></label>
+      </div>
+      <div class="bd-import-head">
+        <h3 class="sheet-sub">Einträge</h3>
+        <button type="button" class="link" id="btn-ics-all">Alle an/aus</button>
+      </div>
+      <ul class="bd-import-list" id="ics-list"></ul>
+      <button type="button" class="btn btn-primary btn-block" id="btn-ics-go">Übernehmen</button>
+      <button type="button" class="link ics-back" id="btn-ics-back">‹ Andere Datei wählen</button>
+    </div>
+  </div>
+
   <!-- Wetter -->
   <div id="sheet-weather" class="sheet" hidden role="dialog" aria-label="Wetter">
     <div class="sheet-handle"></div>
@@ -1140,6 +1190,7 @@
 
     <h3 class="sheet-sub">Mein iCloud</h3>
     <div id="cal-account"></div>
+    <button type="button" class="btn btn-secondary btn-block ics-open" id="btn-cal-import">📥 ICS-Datei importieren</button>
 
     <div id="cal-list-mine-block">
       <h3 class="sheet-sub">Meine Kalender</h3>
@@ -1390,5 +1441,6 @@
   <script src="/js/myday.js"></script>
   <script src="/js/news.js"></script>
   <script src="/js/weather.js"></script>
+  <script src="/js/icsimport.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // Pichis Planner – Service Worker
 // Bei jeder Änderung an App-Dateien die Versionsnummer erhöhen.
-const CACHE = "pp-shell-v0.22.0";
+const CACHE = "pp-shell-v0.23.0";
 
 const SHELL = [
   "/",
@@ -25,6 +25,7 @@ const SHELL = [
   "/js/myday.js",
   "/js/news.js",
   "/js/weather.js",
+  "/js/icsimport.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
