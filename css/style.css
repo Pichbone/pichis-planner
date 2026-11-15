@@ -1375,3 +1375,4 @@ article.wiki-content { background: var(--surface); border-radius: var(--radius);
 .md-day { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: inherit; text-decoration: none; }
 .md-day-date { font-weight: 600; font-size: .9rem; }
 .md-day-text { font-size: .85rem; color: var(--muted); }
+.md-reminder { margin-top: 4px; }

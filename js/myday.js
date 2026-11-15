@@ -201,6 +201,52 @@
     }
   });
 
+  // ---------- Erinnerung am Abend ----------
+  async function pushActive() {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+      const reg = await navigator.serviceWorker.ready;
+      return !!(await reg.pushManager.getSubscription());
+    } catch { return false; }
+  }
+
+  async function renderReminder() {
+    const p = state.profile || {};
+    const f = $("#form-md-reminder");
+    f.enabled.checked = !!p.myday_reminder;
+    f.time.value = p.myday_reminder_time ? String(p.myday_reminder_time).slice(0, 5) : "21:00";
+    $("#md-reminder-time").hidden = !f.enabled.checked;
+    const hint = $("#md-reminder-hint");
+    hint.textContent = f.enabled.checked && !(await pushActive())
+      ? "Mitteilungen sind auf diesem Gerät noch nicht eingeschaltet – Personen-Symbol oben rechts → „Mitteilungen aufs Handy“."
+      : "Nur an Tagen, an denen du noch nichts geschrieben hast.";
+  }
+
+  $("#form-md-reminder").addEventListener("change", async e => {
+    const f = $("#form-md-reminder");
+    $("#md-reminder-time").hidden = !f.enabled.checked;
+    const now = new Date();
+    const time = f.time.value || "21:00";
+    const update = {
+      myday_reminder: f.enabled.checked,
+      myday_reminder_time: time,
+      // Uhrzeit heute schon vorbei? Dann ab morgen erinnern.
+      myday_reminder_last: time <= `${pad(now.getHours())}:${pad(now.getMinutes())}` ? todayIso() : null
+    };
+    const { error } = await sb.from("profiles").update(update).eq("id", me());
+    if (error) {
+      f.enabled.checked = !!(state.profile && state.profile.myday_reminder);
+      $("#md-reminder-time").hidden = !f.enabled.checked;
+      toast(/myday_reminder/.test(error.message) ? "Bitte zuerst das SQL aus Schritt 22 in Supabase ausführen." : translateError(error), true);
+      return;
+    }
+    Object.assign(state.profile, update);
+    renderReminder();
+    if (e.target.name === "enabled" || e.target.name === "time") {
+      toast(f.enabled.checked ? `Erinnerung täglich um ${time} Uhr – nur wenn du noch nichts geschrieben hast.` : "Erinnerung ausgeschaltet.");
+    }
+  });
+
   // ---------- Kachel & Modul ----------
   async function refreshTile() {
     if (!state.session) return;
@@ -216,6 +262,7 @@
       md.day = /^\d{4}-\d{2}-\d{2}$/.test(param || "") && param <= todayIso() ? param : todayIso();
       md.entry = null;
       render();
+      renderReminder();
       try {
         await Promise.all([loadDay(md.day), loadList()]);
       } catch (err) {

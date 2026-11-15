@@ -377,6 +377,13 @@
         <button type="button" class="link" data-act="journal">📔 Meine Worte ins Tagebuch</button>
         <button type="button" class="link danger-link" data-act="delete">Gespräch löschen</button>
       </div>
+      <form id="form-md-reminder" class="card jn-reminder md-reminder" autocomplete="off">
+        <label class="switch"><input type="checkbox" name="enabled"><span>🔔 Abends erinnern (Mitteilung aufs Handy)</span></label>
+        <label id="md-reminder-time" class="jn-reminder-time" hidden>um
+          <input type="time" name="time" step="300" value="21:00"> Uhr
+        </label>
+        <p class="muted small" id="md-reminder-hint">Nur an Tagen, an denen du noch nichts geschrieben hast.</p>
+      </form>
       <p class="muted small md-privacy">🔒 Nur für dich – auch die Familie sieht nichts. Zum Antworten wird dein Text an Claude (Anthropic) geschickt.</p>
       <div id="md-history"></div>
      </div>
