@@ -1489,6 +1489,19 @@
     </div>
 
     <div class="panel-section">
+      <h3>💾 Sicherung</h3>
+      <p class="muted small">Alle Daten, die du in der App sehen kannst, als Datei: Aufgaben, Einkauf, Notizen, Geburtstage, Wiki, Medien, Nachrichten und dein eigenes Tagebuch und „Mein Tag“. Fotos und PDFs bleiben im Speicher (nur ihre Namen sind enthalten).</p>
+      <form id="form-backup" class="form" autocomplete="off">
+        <label class="switch"><input type="checkbox" name="enabled"><span>Am Monatsanfang per E-Mail</span></label>
+      </form>
+      <p class="muted small" id="backup-last"></p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-small" id="btn-backup-mail">✉️ Jetzt per Mail</button>
+        <button type="button" class="btn btn-small" id="btn-backup-download">⬇️ Herunterladen</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
       <button type="button" class="btn btn-ghost" data-logout>Abmelden</button>
       <p class="muted small version">Version <span id="app-version"></span></p>
     </div>
@@ -1520,5 +1533,6 @@
   <script src="/js/weather.js"></script>
   <script src="/js/icsimport.js"></script>
   <script src="/js/commute.js"></script>
+  <script src="/js/backup.js"></script>
 </body>
 </html>
