@@ -1474,3 +1474,6 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 #form-commute .place-list li[data-cm-pick] { padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: .9rem; }
 #form-commute .place-list li[data-cm-pick]:hover { background: var(--blue-soft); }
 .commute-result { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg); line-height: 1.45; }
+
+/* Offline-Hinweis */
+.offline-bar { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: var(--amber-soft, #F7EBCB); color: var(--ink); font-size: .88rem; font-weight: 500; }

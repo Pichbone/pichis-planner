@@ -1,6 +1,6 @@
 // Pichis Planner – Service Worker
 // Bei jeder Änderung an App-Dateien die Versionsnummer erhöhen.
-const CACHE = "pp-shell-v0.27.0";
+const CACHE = "pp-shell-v0.28.0";
 
 const SHELL = [
   "/",
@@ -37,7 +37,11 @@ const SHELL = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  event.waitUntil(caches.open(CACHE).then(async c => {
+    await c.addAll(SHELL);
+    // supabase-js gleich mitnehmen (für den Start ohne Netz); Fehler hier sind nicht schlimm
+    try { await c.add(new Request("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2", { mode: "no-cors" })); } catch { /* später */ }
+  }));
   self.skipWaiting();
 });
 
@@ -54,14 +58,16 @@ self.addEventListener("fetch", event => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
-  // Nur eigene Dateien cachen – Supabase-Daten immer live laden
-  if (url.origin !== self.location.origin) return;
+  // Bibliotheken vom CDN (z. B. supabase-js) ebenfalls merken – damit die App auch ohne Netz startet
+  const cdn = url.hostname === "cdn.jsdelivr.net" || url.hostname === "cdnjs.cloudflare.com";
+  // Sonst nur eigene Dateien cachen – Supabase-Daten immer live laden
+  if (url.origin !== self.location.origin && !cdn) return;
 
   // Erst Netz, bei fehlender Verbindung aus dem Cache
   event.respondWith(
     fetch(req)
       .then(res => {
-        if (res.ok) {
+        if (res.ok || (cdn && res.type === "opaque")) {
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put(req, copy));
         }

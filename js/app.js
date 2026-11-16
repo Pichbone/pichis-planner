@@ -167,11 +167,28 @@
       if (!state.household) { show("household"); return; }
 
       await loadMembers();
+      // Für den Start ohne Netz merken (z. B. im Supermarkt ohne Empfang)
+      storageSet("pp_boot", JSON.stringify({
+        user: state.session.user.id, profile: state.profile, household: state.household, role: state.role, members: state.members
+      }));
       renderApp();
       show("app");
       applyView();
     } catch (err) {
       console.error(err);
+      // Kein Netz: mit dem zuletzt bekannten Stand weitermachen
+      let boot = null;
+      try { boot = JSON.parse(storageGet("pp_boot") || "null"); } catch { /* egal */ }
+      const offline = !navigator.onLine || /Failed to fetch|NetworkError|Load failed|network/i.test(String(err && err.message));
+      if (offline && boot && state.session && boot.user === state.session.user.id) {
+        state.profile = boot.profile; state.household = boot.household; state.role = boot.role; state.members = boot.members || [];
+        $$("[data-user-name]").forEach(el => { el.textContent = state.profile.display_name || ""; });
+        renderApp();
+        show("app");
+        applyView();
+        toast("Offline – du siehst den zuletzt geladenen Stand.");
+        return;
+      }
       toast(translateError(err), true);
       show(state.session ? "household" : "auth");
     } finally {

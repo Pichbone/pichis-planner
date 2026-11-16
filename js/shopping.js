@@ -81,8 +81,122 @@
     active: false,
     tags: [],
     tagFilter: storageGet("pp_shop_tag") || "",
-    draftTags: new Set()
+    draftTags: new Set(),
+    offline: false,
+    flushing: false
   };
+
+  // =========================================================
+  // Offline: letzter Stand im Gerät, Änderungen werden vorgemerkt
+  // und übertragen, sobald wieder Netz da ist.
+  // =========================================================
+  const cacheKey = () => "pp_shop_cache_" + state.household.id;
+  const outboxKey = () => "pp_shop_outbox_" + state.household.id;
+
+  function isNetworkError(err) {
+    const m = String((err && (err.message || err.details)) || err || "");
+    return !navigator.onLine || /Failed to fetch|NetworkError|Load failed|network|fetch failed|Netzwerk|offline/i.test(m);
+  }
+
+  function saveCache() {
+    try {
+      storageSet(cacheKey(), JSON.stringify({
+        at: Date.now(), lists: shop.lists, items: shop.items, tags: shop.tags,
+        history: [...shop.history.values()].slice(0, 500)
+      }));
+    } catch { /* Speicher voll – egal */ }
+  }
+
+  function readCache() {
+    try { return JSON.parse(storageGet(cacheKey()) || "null"); } catch { return null; }
+  }
+
+  function outbox() {
+    try { return JSON.parse(storageGet(outboxKey()) || "[]"); } catch { return []; }
+  }
+  function setOutbox(ops) { storageSet(outboxKey(), JSON.stringify(ops)); }
+
+  // Eine Änderung ausführen – ohne Netz vormerken (lokal ist sie schon sichtbar)
+  async function runOp(op) {
+    if (op.op === "insert") {
+      const { error } = await sb.from("shopping_items").insert(op.rows);
+      // schon vorhanden (z. B. doppelt übertragen) → als erledigt betrachten
+      if (error && !/duplicate key/i.test(error.message || "")) throw error;
+    } else if (op.op === "update") {
+      const { error } = await sb.from("shopping_items").update(op.fields).eq("id", op.id);
+      if (error) throw error;
+    } else if (op.op === "delete") {
+      const { error } = await sb.from("shopping_items").delete().in("id", op.ids);
+      if (error) throw error;
+    }
+  }
+
+  async function mutate(op) {
+    const pending = outbox();
+    if (pending.length || !navigator.onLine) {
+      // Reihenfolge wahren: hinten anstellen
+      setOutbox([...pending, op]);
+      setOffline(true);
+      saveCache();
+      flushSoon();
+      return;
+    }
+    try {
+      await runOp(op);
+      saveCache();
+    } catch (err) {
+      if (!isNetworkError(err)) throw err;
+      setOutbox([...outbox(), op]);
+      setOffline(true);
+      saveCache();
+    }
+  }
+
+  let flushTimer = null;
+  function flushSoon() { clearTimeout(flushTimer); flushTimer = setTimeout(flush, 1500); }
+
+  async function flush() {
+    if (shop.flushing || !state.household) return;
+    let ops = outbox();
+    if (!ops.length) { setOffline(false); return; }
+    if (!navigator.onLine) return;
+    shop.flushing = true;
+    let sent = 0, dropped = 0;
+    try {
+      while (ops.length) {
+        try {
+          await runOp(ops[0]);
+          sent++;
+        } catch (err) {
+          if (isNetworkError(err)) { setOffline(true); return; }
+          console.warn("Vorgemerkte Änderung verworfen:", err);
+          dropped++;
+        }
+        ops = ops.slice(1);
+        setOutbox(ops);
+      }
+      setOffline(false);
+      if (sent) toast(`Wieder online – ${sent} Änderung${sent === 1 ? "" : "en"} übertragen.`);
+      if (dropped) toast(`${dropped} Änderung${dropped === 1 ? "" : "en"} konnte${dropped === 1 ? "" : "n"} nicht übertragen werden.`, true);
+      if (shop.active) { await loadAll(); render(); }
+    } finally {
+      shop.flushing = false;
+    }
+  }
+
+  function setOffline(on) {
+    shop.offline = on;
+    const n = state.household ? outbox().length : 0;
+    const bar = $("#shop-offline");
+    if (!bar) return;
+    bar.hidden = !on && !n;
+    bar.textContent = n
+      ? `📴 Offline – ${n} Änderung${n === 1 ? " wird" : "en werden"} übertragen, sobald wieder Netz da ist.`
+      : "📴 Offline – du siehst den zuletzt geladenen Stand. Abhaken und Hinzufügen geht trotzdem.";
+  }
+
+  window.addEventListener("online", () => flush());
+  window.addEventListener("offline", () => setOffline(true));
 
   // ---------- Tags ----------
   const TAG_COLORS = ["#E0703F", "#2F5D50", "#3B6EA5", "#8E5BB5", "#B7791F", "#0F766E", "#BE185D", "#4B5563", "#C2410C"];
@@ -181,6 +295,27 @@
 
   // ---------- Daten ----------
   async function loadAll() {
+    try {
+      if (outbox().length && navigator.onLine) await flush();
+      await loadAllOnline();
+      saveCache();
+      if (!outbox().length) setOffline(false);
+    } catch (err) {
+      const c = readCache();
+      if (!isNetworkError(err) || !c) throw err;
+      shop.lists = c.lists || [];
+      shop.items = c.items || [];
+      shop.tags = c.tags || [];
+      shop.history = new Map((c.history || []).map(h => [h.name_key, h]));
+      const saved = storageGet("pp_list");
+      if (!shop.lists.some(l => l.id === shop.activeListId)) {
+        shop.activeListId = shop.lists.some(l => l.id === saved) ? saved : (shop.lists[0] && shop.lists[0].id);
+      }
+      setOffline(true);
+    }
+  }
+
+  async function loadAllOnline() {
     const hid = state.household.id;
     const [lists, items, history] = await Promise.all([
       sb.from("shopping_lists").select("*").eq("household_id", hid)
@@ -255,6 +390,7 @@
       const key = payload.new.name.toLowerCase();
       shop.history.set(key, { name: payload.new.name, name_key: key, category: payload.new.category });
     }
+    saveCache();
     render();
   }
 
@@ -296,6 +432,9 @@
         reactivate.push({ id: existing.id, quantity: e.quantity || existing.quantity, is_done: false, tag_ids: merge(existing) });
       } else {
         inserts.push({
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          is_done: false,
           list_id: listId,
           household_id: state.household.id,
           name: e.name,
@@ -307,17 +446,16 @@
     }
 
     if (inserts.length) {
-      const { data, error } = await sb.from("shopping_items").insert(inserts).select();
-      if (error) throw error;
-      data.forEach(row => upsertLocal(shop.items, row));
+      inserts.forEach(row => upsertLocal(shop.items, { note: "", ...row, tag_ids: row.tag_ids || [] }));
+      render();
+      await mutate({ op: "insert", rows: inserts.map(({ created_at, ...r }) => r) });
     }
     for (const r of reactivate) {
       const upd = { quantity: r.quantity, is_done: false };
       if (tagIds.length) upd.tag_ids = r.tag_ids;
-      const { data, error } = await sb.from("shopping_items")
-        .update(upd).eq("id", r.id).select().single();
-      if (error) throw error;
-      upsertLocal(shop.items, data);
+      const item = shop.items.find(x => x.id === r.id);
+      if (item) Object.assign(item, upd);
+      await mutate({ op: "update", id: r.id, fields: upd });
     }
     render();
 
@@ -331,28 +469,24 @@
     const before = item.is_done;
     item.is_done = !before;
     render();
-    const { data, error } = await sb.from("shopping_items")
-      .update({ is_done: !before }).eq("id", id).select().single();
-    if (error) {
+    try {
+      await mutate({ op: "update", id, fields: { is_done: !before } });
+    } catch (error) {
       item.is_done = before;
       render();
       toast(translateError(error), true);
-      return;
     }
-    upsertLocal(shop.items, data);
-    render();
   }
 
   async function clearDone() {
     const done = shop.items.filter(x => x.list_id === shop.activeListId && x.is_done);
     if (done.length === 0) return;
     if (!confirm(`${done.length} erledigte Artikel von der Liste entfernen?`)) return;
-    const { error } = await sb.from("shopping_items")
-      .delete().eq("list_id", shop.activeListId).eq("is_done", true);
-    if (error) { toast(translateError(error), true); return; }
     const ids = new Set(done.map(x => x.id));
     shop.items = shop.items.filter(x => !ids.has(x.id));
     render();
+    try { await mutate({ op: "delete", ids: [...ids] }); }
+    catch (error) { toast(translateError(error), true); await loadAll(); render(); }
   }
 
   // ---------- Darstellung ----------
@@ -495,9 +629,13 @@
       const before = shop.items.find(x => x.id === shop.editingItemId);
       const tagIds = [...shop.draftTags].filter(id => shop.tags.some(t => t.id === id));
       if (tagIds.length || (before && before.tag_ids && before.tag_ids.length)) upd.tag_ids = tagIds;
-      const { data, error } = await sb.from("shopping_items").update(upd).eq("id", shop.editingItemId).select().single();
-      if (error && /tag_ids/.test(error.message || "")) throw new Error("Bitte zuerst das SQL aus Schritt 15 in Supabase ausführen.");
-      if (error) throw error;
+      try {
+        await mutate({ op: "update", id: shop.editingItemId, fields: upd });
+      } catch (error) {
+        if (/tag_ids/.test(error.message || "")) throw new Error("Bitte zuerst das SQL aus Schritt 15 in Supabase ausführen.");
+        throw error;
+      }
+      const data = { ...before, ...upd };
       upsertLocal(shop.items, data);
       shop.history.set(data.name.toLowerCase(), { name: data.name, name_key: data.name.toLowerCase(), category: data.category });
       closeSheets();
@@ -532,9 +670,10 @@
 
   $("#btn-delete-item").addEventListener("click", async () => {
     const id = shop.editingItemId;
-    const { error } = await sb.from("shopping_items").delete().eq("id", id);
-    if (error) { toast(translateError(error), true); return; }
+    try { await mutate({ op: "delete", ids: [id] }); }
+    catch (error) { toast(translateError(error), true); return; }
     shop.items = shop.items.filter(x => x.id !== id);
+    saveCache();
     closeSheets();
     render();
   });
@@ -555,6 +694,7 @@
     const f = e.target;
     PP.withBusy(f, async () => {
       const name = f.name.value.trim();
+      if (!navigator.onLine) throw new Error("Listen anlegen und umbenennen geht nur mit Internet.");
       if (shop.editingListId) {
         const { data, error } = await sb.from("shopping_lists")
           .update({ name }).eq("id", shop.editingListId).select().single();
@@ -635,7 +775,12 @@
       .select("id", { count: "exact", head: true })
       .eq("household_id", state.household.id)
       .eq("is_done", false);
-    if (error) return;
+    if (error) {
+      const c = readCache();
+      if (c) { const n = (c.items || []).filter(x => !x.is_done).length; $("#tile-shop-status").textContent = (n ? `${n} offen` : "Alles erledigt") + " · offline"; }
+      return;
+    }
+    if (outbox().length) flush();
     $("#tile-shop-status").textContent = count ? `${count} offen` : "Alles erledigt";
   }
 
@@ -651,7 +796,7 @@
         if (!$("#form-item").category.options.length) fillCategorySelect();
         await loadAll();
         render();
-        subscribe();
+        if (!shop.offline) subscribe();
       } catch (err) {
         console.error(err);
         toast(translateError(err), true);
