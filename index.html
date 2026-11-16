@@ -1419,6 +1419,54 @@
     </div>
 
     <div class="panel-section">
+      <h3>🚗 Fahrtzeit</h3>
+      <p class="muted small">Vor der Abfahrt eine Mitteilung mit der aktuellen Fahrtzeit und Staus. Tippen öffnet die Route in Apple Karten.</p>
+      <form id="form-commute" class="form" autocomplete="off">
+        <label class="switch"><input type="checkbox" name="enabled"><span>Fahrtzeit-Mitteilung</span></label>
+        <div id="commute-fields" class="form" hidden>
+          <div class="place-field">
+            <label>Von
+              <input type="text" name="from" maxlength="300" placeholder="Adresse zu Hause suchen">
+            </label>
+            <ul class="place-list" id="commute-from-list" hidden></ul>
+          </div>
+          <div class="place-field">
+            <label>Nach
+              <input type="text" name="to" maxlength="300" placeholder="Adresse der Arbeit suchen">
+            </label>
+            <ul class="place-list" id="commute-to-list" hidden></ul>
+          </div>
+          <div>
+            <span class="field-label">An diesen Tagen</span>
+            <div class="chip-wrap rp-days" id="commute-days"></div>
+          </div>
+          <div class="form-row form-row-even">
+            <label>Abfahrt
+              <input type="time" name="time" step="300" value="07:30">
+            </label>
+            <label>Mitteilung
+              <select name="lead">
+                <option value="0">zur Abfahrt</option>
+                <option value="10">10 Min. vorher</option>
+                <option value="15">15 Min. vorher</option>
+                <option value="20">20 Min. vorher</option>
+                <option value="30">30 Min. vorher</option>
+                <option value="45">45 Min. vorher</option>
+                <option value="60">1 Std. vorher</option>
+              </select>
+            </label>
+          </div>
+          <label class="switch"><input type="checkbox" name="return_on"><span>Auch für den Rückweg</span></label>
+          <label id="commute-return-time" hidden>Abfahrt zurück
+            <input type="time" name="return_time" step="300" value="17:00">
+          </label>
+          <button type="button" class="btn btn-small" id="btn-commute-check">Jetzt prüfen</button>
+          <p class="commute-result" id="commute-result" hidden></p>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel-section">
       <h3>Startseite</h3>
       <p class="muted small">Kacheln ein- und ausblenden, mit ↑ ↓ sortieren und mit ↔︎ breit anzeigen. Gilt nur für dich – auf all deinen Geräten.</p>
       <ul class="ts-list" id="tiles-settings"></ul>
@@ -1471,5 +1519,6 @@
   <script src="/js/news.js"></script>
   <script src="/js/weather.js"></script>
   <script src="/js/icsimport.js"></script>
+  <script src="/js/commute.js"></script>
 </body>
 </html>

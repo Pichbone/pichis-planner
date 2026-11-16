@@ -1,6 +1,6 @@
 // Pichis Planner – Service Worker
 // Bei jeder Änderung an App-Dateien die Versionsnummer erhöhen.
-const CACHE = "pp-shell-v0.25.0";
+const CACHE = "pp-shell-v0.26.0";
 
 const SHELL = [
   "/",
@@ -27,6 +27,7 @@ const SHELL = [
   "/js/news.js",
   "/js/weather.js",
   "/js/icsimport.js",
+  "/js/commute.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -92,6 +93,8 @@ self.addEventListener("notificationclick", event => {
   event.notification.close();
   const target = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
   event.waitUntil((async () => {
+    // Fremde Adresse (z. B. Apple Karten bei der Fahrtzeit): direkt öffnen, App bleibt, wie sie ist
+    if (new URL(target).origin !== self.location.origin) { await self.clients.openWindow(target); return; }
     const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const c of all) {
       if (new URL(c.url).origin === self.location.origin) {

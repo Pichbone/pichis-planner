@@ -1469,3 +1469,8 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .ts-btn { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: 1rem; cursor: pointer; }
 .ts-btn:disabled { opacity: .3; cursor: default; }
 .ts-btn.on { background: var(--green); border-color: var(--green); color: #fff; }
+
+/* Fahrtzeit */
+#form-commute .place-list li[data-cm-pick] { padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: .9rem; }
+#form-commute .place-list li[data-cm-pick]:hover { background: var(--blue-soft); }
+.commute-result { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg); line-height: 1.45; }
