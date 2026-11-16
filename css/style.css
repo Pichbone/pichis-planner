@@ -1451,3 +1451,21 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .ics-opts { margin-bottom: 8px; }
 .ics-back { display: block; margin: 10px auto 0; }
 .bd-import-row .bd-main { min-width: 0; }
+
+/* =========================================================
+   Startseite: Kacheln einrichten
+   ========================================================= */
+.tile.tile-wide { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 14px; align-items: center; }
+.tile.tile-wide .tile-icon { grid-row: 1 / span 2; font-size: 2rem; }
+.tile.tile-wide .tile-name, .tile.tile-wide .tile-status { margin: 0; }
+
+.ts-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.ts-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ts-row.is-hidden .ts-icon, .ts-row.is-hidden .ts-name { opacity: .45; }
+.ts-show { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; font-weight: 500; }
+.ts-show input { width: 20px; height: 20px; flex-shrink: 0; margin: 0; accent-color: var(--green); }
+.ts-icon { width: 1.5rem; text-align: center; }
+.ts-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-btn { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: 1rem; cursor: pointer; }
+.ts-btn:disabled { opacity: .3; cursor: default; }
+.ts-btn.on { background: var(--green); border-color: var(--green); color: #fff; }

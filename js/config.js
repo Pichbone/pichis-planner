@@ -4,7 +4,7 @@
 window.PP_CONFIG = {
   SUPABASE_URL: "https://pgevrbsvyinowxrpxgpp.supabase.co",
   SUPABASE_KEY: "sb_publishable_q2ZVeMgvJyqgE_vty9zXJA_hk_vCyjm",
-  APP_VERSION: "0.24.0",
+  APP_VERSION: "0.25.0",
   // Ort für das Wetter oben auf der Startseite (für alle gleich)
   WEATHER: { name: "Bodenheim", lat: 49.9294, lon: 8.3117 }
 };
