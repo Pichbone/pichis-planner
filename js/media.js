@@ -15,6 +15,7 @@
     film:  { label: "Film",  plural: "Filme",  icon: "🎬", done: "gesehen" },
     kino:  { label: "Kino",  plural: "Kino",   icon: "🍿", done: "gesehen" },
     serie: { label: "Serie", plural: "Serien", icon: "📺", done: "gesehen" },
+    iptv:  { label: "IPTV",  plural: "IPTV",   icon: "📡", done: "gesehen" },
     buch:  { label: "Buch",  plural: "Bücher", icon: "📚", done: "gelesen" },
     link:  { label: "Link",  plural: "Links",  icon: "🔗", done: "erledigt" }
   };
@@ -210,6 +211,11 @@
       `<button type="button" class="chip${k === type ? " active" : ""}" data-add-type="${k}">${t.icon} ${t.label}</button>`).join("");
     const isLink = type === "link";
     const f = $("#form-media-search");
+    // IPTV (Sender, Sendungen, Playlists): keine Suche – direkt unten eintragen
+    const manual = type === "iptv";
+    f.hidden = manual;
+    const hint = $("#media-manual-hint");
+    if (hint) hint.hidden = !manual;
     f.q.placeholder = isLink ? "Adresse einfügen, z. B. https://…" : `${TYPES[type].label} suchen, z. B. Titel oder Name`;
     f.q.type = isLink ? "url" : "search";
     $("#btn-media-search").textContent = isLink ? "Infos laden" : "Suchen";
