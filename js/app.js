@@ -211,7 +211,8 @@
     "geburtstage": { id: "birthdays", title: "Geburtstage", module: "birthdays" },
     "meintag": { id: "myday", title: "Mein Tag", module: "myday" },
     "news": { id: "news", title: "News", module: "news" },
-    "archiv": { id: "archive", title: "Archiv", module: "archive" }
+    "archiv": { id: "archive", title: "Archiv", module: "archive" },
+    "essen": { id: "meals", title: "Essensplan", module: "meals" }
   };
   let activeView = null;
 

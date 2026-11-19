@@ -188,6 +188,11 @@
           <div class="tile-name">Notizen</div>
           <div class="tile-status" id="tile-note-status">Öffnen</div>
         </a>
+        <a class="tile tile-active tile-meal" href="#/essen">
+          <div class="tile-icon">🍽️</div>
+          <div class="tile-name">Essensplan</div>
+          <div class="tile-status" id="tile-meal-status">Was gibt's heute?</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -366,6 +371,28 @@
 
       <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
       <div id="jn-items"></div>
+     </div>
+
+     <!-- ===== Essensplan ===== -->
+     <div id="view-meals" class="view" hidden>
+      <div class="chips" id="meal-tabs"></div>
+      <div id="meal-week">
+        <div class="meal-weekbar">
+          <button class="icon-btn" id="btn-meal-prev" aria-label="Vorige Woche">‹</button>
+          <strong id="meal-week-title"></strong>
+          <button class="icon-btn" id="btn-meal-next" aria-label="Nächste Woche">›</button>
+          <button class="btn btn-small" id="btn-meal-today">Heute</button>
+        </div>
+        <ul class="meal-days" id="meal-days"></ul>
+        <button class="btn btn-primary btn-block" id="btn-meal-shop">🛒 Zutaten auf die Einkaufsliste</button>
+      </div>
+      <div id="meal-recipes" hidden>
+        <div class="note-toolbar">
+          <input type="search" id="recipe-search" placeholder="Rezept oder Zutat suchen" aria-label="Rezepte durchsuchen" autocomplete="off">
+          <button class="btn btn-small" id="btn-recipe-add">+ Rezept</button>
+        </div>
+        <div id="recipe-items"></div>
+      </div>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -815,6 +842,98 @@
   <div id="jn-viewer" class="jn-viewer" hidden role="dialog" aria-label="Bild">
     <img id="jn-viewer-img" alt="">
     <span class="jn-viewer-close">✕</span>
+  </div>
+
+  <!-- Essensplan: Tag -->
+  <div id="sheet-meal" class="sheet" hidden role="dialog" aria-label="Abendessen planen">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="meal-sheet-title">Abendessen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-meal" class="form" autocomplete="off">
+      <div>
+        <span class="field-label">Aus den Rezepten</span>
+        <input type="search" id="meal-search" placeholder="Rezept suchen" aria-label="Rezept suchen">
+        <div class="chip-wrap meal-pick" id="meal-pick"></div>
+      </div>
+      <label>Oder etwas anderes
+        <input type="text" name="title" maxlength="120" placeholder="z. B. Pizza bestellen, Reste, Essen gehen">
+      </label>
+      <div class="meal-servings">
+        <span class="field-label">Personen</span>
+        <div class="stepper">
+          <button type="button" class="ts-btn" data-step="-1" aria-label="Weniger">−</button>
+          <input type="text" name="servings" maxlength="2" value="4" inputmode="numeric" pattern="[0-9]*" aria-label="Personen">
+          <button type="button" class="ts-btn" data-step="1" aria-label="Mehr">+</button>
+        </div>
+      </div>
+      <label>Notiz <span class="hint">(optional)</span>
+        <input type="text" name="note" maxlength="500" placeholder="z. B. Oma kommt, früher essen">
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div class="note-actions">
+      <button type="button" class="link" id="btn-meal-show-recipe">📖 Rezept ansehen</button>
+      <button type="button" class="link danger-link" id="btn-meal-remove" hidden>Entfernen</button>
+    </div>
+  </div>
+
+  <!-- Essensplan: Rezept -->
+  <div id="sheet-recipe" class="sheet sheet-tall" hidden role="dialog" aria-label="Rezept">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="recipe-sheet-title">Rezept</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-recipe" class="form" autocomplete="off">
+      <label>Name
+        <input type="text" name="name" maxlength="120" placeholder="z. B. Spaghetti Bolognese">
+      </label>
+      <div class="form-row form-row-even">
+        <label>Für Personen
+          <input type="text" name="servings" maxlength="2" value="4" inputmode="numeric" pattern="[0-9]*">
+        </label>
+        <label class="switch recipe-fav"><input type="checkbox" name="is_favorite"><span>⭐ Lieblingsgericht</span></label>
+      </div>
+      <label>Zutaten <span class="hint">(eine pro Zeile)</span>
+        <textarea name="ingredients" rows="7" maxlength="5000" placeholder="500 g Hackfleisch&#10;400 g Spaghetti&#10;1 Zwiebel&#10;2 Zehen Knoblauch&#10;1 Dose Tomaten"></textarea>
+      </label>
+      <p class="muted small" id="recipe-preview"></p>
+      <label>Zubereitung <span class="hint">(optional)</span>
+        <textarea name="instructions" rows="5" maxlength="20000"></textarea>
+      </label>
+      <label>Link zum Rezept <span class="hint">(optional)</span>
+        <input type="url" name="url" maxlength="1000" placeholder="https://…">
+      </label>
+      <p class="small" id="recipe-link"></p>
+      <label>Gleich einplanen am <span class="hint">(optional)</span>
+        <input type="date" name="plan_day">
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div class="note-actions">
+      <span></span>
+      <button type="button" class="link danger-link" id="btn-recipe-delete" hidden>Rezept löschen</button>
+    </div>
+  </div>
+
+  <!-- Essensplan: Einkaufsliste -->
+  <div id="sheet-meal-shop" class="sheet sheet-tall" hidden role="dialog" aria-label="Zutaten auf die Einkaufsliste">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>🛒 Zutaten übernehmen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <p class="muted small" id="meal-shop-dishes"></p>
+    <div class="form">
+      <label>Auf die Liste
+        <select id="meal-shop-list"></select>
+      </label>
+    </div>
+    <ul class="bd-import-list" id="meal-shop-items"></ul>
+    <button type="button" class="btn btn-primary btn-block" id="btn-meal-shop-go">Übernehmen</button>
+    <p class="muted small">Mengen sind auf die geplante Personenzahl umgerechnet. Gleiche Zutaten aus mehreren Rezepten werden zusammengezählt.</p>
   </div>
 
   <!-- Archiv: Dokument -->
@@ -1373,6 +1492,7 @@
       <label class="switch"><input type="checkbox" id="cal-show-shop"><span>🛒 Einkaufsliste bei „Heute“ anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-notes"><span>📝 Notizen mit Datum anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-bdays"><span>🎂 Geburtstage anzeigen</span></label>
+      <label class="switch"><input type="checkbox" id="cal-show-meals"><span>🍽️ Abendessen anzeigen</span></label>
       <p class="muted small">Gilt für dieses Gerät.</p>
     </div>
 
@@ -1669,5 +1789,6 @@
   <script src="/js/backup.js"></script>
   <script src="/js/archive.js"></script>
   <script src="/js/tags.js"></script>
+  <script src="/js/meals.js"></script>
 </body>
 </html>

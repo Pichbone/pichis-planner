@@ -1510,3 +1510,28 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .tg-preview { margin: 0; }
 #tg-merge-row .inline-form select { flex: 1; min-width: 0; }
 #sheet-tag { z-index: 30; }   /* öffnet sich über den Einstellungen */
+
+/* =========================================================
+   Essensplan
+   ========================================================= */
+:root { --meal: #A3520F; --meal-soft: #FCE9D7; }
+@media (prefers-color-scheme: dark) { :root { --meal: #F2A766; --meal-soft: #33241A; } }
+.tile-meal { border-color: var(--meal); background: var(--meal-soft); }
+.tile-meal .tile-status { color: var(--meal); }
+.meal-weekbar { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.meal-weekbar strong { flex: 1; text-align: center; font-size: .95rem; }
+.meal-days { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.meal-day { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: inherit; font: inherit; cursor: pointer; }
+.meal-day.is-today { border-color: var(--meal); background: var(--meal-soft); }
+.meal-day.is-past { opacity: .6; }
+.meal-date { display: flex; flex-direction: column; align-items: center; width: 42px; flex-shrink: 0; line-height: 1.1; color: var(--meal); }
+.meal-date small { font-size: .72rem; color: var(--muted); }
+.meal-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.meal-dish { font-weight: 600; overflow-wrap: anywhere; }
+.meal-sub { font-size: .8rem; color: var(--muted); }
+.meal-empty { color: var(--muted); font-size: .92rem; }
+.meal-pick { margin-top: 8px; max-height: 160px; overflow-y: auto; }
+.stepper { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.form .stepper input { width: 4.5rem; text-align: center; }
+.recipe-fav { align-self: end; padding-bottom: 10px; }
+.cal-meal { border-left-color: var(--meal); }

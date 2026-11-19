@@ -29,6 +29,8 @@
     showShopping: storageGet("pp_cal_shop") === "1",
     showNotes: storageGet("pp_cal_notes") !== "0",
     showBdays: storageGet("pp_cal_bdays") !== "0",
+    showMeals: storageGet("pp_cal_meals") !== "0",
+    meals: [],
     notes: [],
     bdays: [],
     todos: [],
@@ -124,6 +126,15 @@
         .then(r => { cal.notes = r.error ? [] : r.data; }));
     } else {
       cal.notes = [];
+    }
+    if (cal.showMeals) {
+      jobs.push(sb.from("meal_plan")
+        .select("day, title, servings, recipe_id, recipes(name)")
+        .eq("household_id", hid)
+        .gte("day", isoDate(start)).lt("day", isoDate(end))
+        .then(r => { cal.meals = r.error ? [] : (r.data || []); }));
+    } else {
+      cal.meals = [];
     }
     if (cal.showBdays) {
       jobs.push(sb.from("birthdays")
@@ -366,8 +377,17 @@
         }).join("")}</ul>`
       : `<p class="muted cal-empty">${cal.loading ? "Termine werden geladen …" : "Keine Termine."}</p>`;
 
-    // Geburtstage des Tages
+    // Abendessen des Tages
     let extra = "";
+    const meal = cal.showMeals && cal.meals.find(m => m.day === cal.selected);
+    if (meal) {
+      const dish = (meal.recipes && meal.recipes.name) || meal.title || (meal.recipe_id ? "Geplantes Gericht" : "");
+      if (dish) extra += `<h4 class="cal-sub">🍽️ Abendessen</h4><a class="cal-shop cal-meal" href="#/essen">
+        <span class="event-title">${escapeHtml(dish)}</span>
+        <span class="event-sub">${meal.recipe_id ? `für ${meal.servings} Personen` : "Essensplan"}</span></a>`;
+    }
+
+    // Geburtstage des Tages
     const bds = bdaysOn(cal.selected);
     if (bds.length) {
       extra += `<h4 class="cal-sub">🎂 Geburtstage</h4><ul class="events">${bds.map(b => {
@@ -1009,6 +1029,7 @@
     $("#cal-show-shop").checked = cal.showShopping;
     $("#cal-show-notes").checked = cal.showNotes;
     $("#cal-show-bdays").checked = cal.showBdays;
+    $("#cal-show-meals").checked = cal.showMeals;
 
     $("#cal-tag-list").innerHTML = cal.tags.length
       ? cal.tags.map(t => `<li class="cal-row">${tagChip(t)}<button class="icon-btn small" data-del-tag="${t.id}" aria-label="Tag löschen">✕</button></li>`).join("")
@@ -1017,7 +1038,9 @@
 
   $("#sheet-calsettings").addEventListener("change", async e => {
     const t = e.target;
-    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes" || t.id === "cal-show-bdays") {
+    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes" || t.id === "cal-show-bdays" || t.id === "cal-show-meals") {
+      cal.showMeals = $("#cal-show-meals").checked;
+      storageSet("pp_cal_meals", cal.showMeals ? "1" : "0");
       cal.showTodos = $("#cal-show-todos").checked;
       cal.showShopping = $("#cal-show-shop").checked;
       cal.showNotes = $("#cal-show-notes").checked;
