@@ -54,6 +54,8 @@
     if (/Password should be at least/i.test(m)) return "Das Passwort muss mindestens 8 Zeichen haben.";
     if (/remind_at|remind_offset|reminded_at/.test(m)) return "Für Erinnerungen bitte zuerst das SQL aus Schritt 25 in Supabase ausführen.";
     if (/repeat_interval|repeat_days|repeat_until/.test(m)) return "Für benutzerdefinierte Wiederholungen bitte zuerst das SQL aus Schritt 20 in Supabase ausführen.";
+    if (/rss_feeds_url_uq/.test(m)) return "Diesen Feed gibt es schon.";
+    if (/relation .*rss_(feeds|marks)|rss_(feeds|marks).* does not exist|schema cache.*rss_/i.test(m)) return "Für eigene Feeds bitte zuerst das SQL aus Schritt 33 in Supabase ausführen.";
     if (/rate limit|too many/i.test(m)) return "Zu viele Versuche. Bitte warte kurz und versuche es erneut.";
     if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Keine Verbindung. Bitte Internet prüfen.";
     return m;

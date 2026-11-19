@@ -413,6 +413,7 @@
      <div id="view-news" class="view" hidden>
       <div class="news-bar">
         <div class="chips" id="news-cats"></div>
+        <button class="icon-btn" id="btn-news-feeds" aria-label="Feeds verwalten" title="Eigene Feeds">⚙︎</button>
         <button class="icon-btn" id="btn-news-refresh" aria-label="Neu laden" title="Neu laden">↻</button>
       </div>
       <div id="news-items"></div>
@@ -1040,6 +1041,36 @@
   </div>
 
   <!-- Tag bearbeiten -->
+  <div id="sheet-rss" class="sheet" hidden role="dialog" aria-label="Eigene Feeds">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Eigene Feeds</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <ul class="rss-feeds" id="rss-feed-list"></ul>
+    <h3 class="sheet-sub">Feed hinzufügen</h3>
+    <form id="form-rss-find" class="inline-form" autocomplete="off">
+      <input type="text" name="url" inputmode="url" maxlength="1000" placeholder="Webseite oder Feed-Adresse, z. B. heise.de" aria-label="Webseite oder Feed-Adresse" required>
+      <button type="submit" class="btn btn-small">Suchen</button>
+    </form>
+    <div class="chips rss-suggest" id="rss-suggest"></div>
+    <form id="form-rss-save" class="form" autocomplete="off">
+      <div id="rss-found" hidden>
+        <p class="muted small" id="rss-found-info"></p>
+        <label>Name
+          <input type="text" name="title" maxlength="120" required>
+        </label>
+        <label>Rubrik
+          <input type="text" name="category" maxlength="40" list="rss-cat-list" placeholder="Meine Feeds">
+          <datalist id="rss-cat-list"></datalist>
+        </label>
+        <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Nur für mich</span></label>
+        <button type="submit" class="btn btn-primary btn-block">Feed hinzufügen</button>
+      </div>
+    </form>
+    <p class="muted small">Die meisten Webseiten haben einen Feed – einfach die Adresse der Seite eingeben, der Feed wird automatisch gefunden. Gelesene und ⭐ gemerkte Artikel siehst nur du.</p>
+  </div>
+
   <div id="sheet-tag" class="sheet" hidden role="dialog" aria-label="Tag bearbeiten">
     <div class="sheet-handle"></div>
     <div class="panel-head">

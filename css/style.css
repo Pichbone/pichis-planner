@@ -1535,3 +1535,24 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .form .stepper input { width: 4.5rem; text-align: center; }
 .recipe-fav { align-self: end; padding-bottom: 10px; }
 .cal-meal { border-left-color: var(--meal); }
+
+/* RSS-Reader */
+.news-li { position: relative; }
+.news-li .news-item { padding-right: 46px; }
+.news-li.is-read .news-item { opacity: .55; }
+.news-li.is-read .news-title { font-weight: 500; }
+.news-star {
+  position: absolute; top: 6px; right: 6px; width: 38px; height: 38px;
+  border: 0; background: transparent; font-size: 1.35rem; line-height: 1; color: var(--muted); cursor: pointer; border-radius: 50%;
+}
+.news-star.on { color: #E0A100; }
+.news-star:active { transform: scale(.9); }
+.news-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 2px 2px 8px; }
+.news-head .link { font-size: .85rem; }
+.rss-feeds { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rss-cat { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--news); margin: 10px 2px 2px; }
+.rss-feed { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); }
+.rss-feed-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rss-feed-title { font-weight: 600; overflow-wrap: anywhere; }
+.rss-suggest { margin: 8px 0 4px; }
+#form-rss-find input { min-width: 0; }
