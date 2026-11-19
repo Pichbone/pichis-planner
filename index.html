@@ -1660,10 +1660,23 @@
           <label>Uhrzeit
             <input type="time" name="time" step="900" required>
           </label>
+          <label class="switch"><input type="checkbox" name="second"><span>Zweite Mail am Tag</span></label>
+          <div id="digest-second" class="form" hidden>
+            <label>Uhrzeit der zweiten Mail
+              <input type="time" name="time2" step="900">
+            </label>
+            <label>Inhalt der zweiten Mail
+              <select name="mode2">
+                <option value="tomorrow">Vorschau auf morgen</option>
+                <option value="today">Aktueller Stand von heute</option>
+              </select>
+            </label>
+          </div>
           <label class="switch"><input type="checkbox" name="skip_empty"><span>An Tagen ohne Termine, Aufgaben und Einkäufe auslassen</span></label>
         </div>
         <button type="submit" class="btn btn-secondary">Speichern</button>
         <button type="button" class="link" id="btn-digest-test">Testmail jetzt senden</button>
+        <button type="button" class="link" id="btn-digest-test2" hidden>Test: Vorschau auf morgen</button>
       </form>
     </div>
 

@@ -413,12 +413,22 @@
     f.enabled.checked = !!p.digest_enabled;
     f.time.value = String(p.digest_time || "06:30").slice(0, 5);
     f.skip_empty.checked = !!p.digest_skip_empty;
+    f.second.checked = !!p.digest_time2;
+    f.time2.value = String(p.digest_time2 || "18:00").slice(0, 5);
+    f.mode2.value = p.digest_mode2 === "today" ? "today" : "tomorrow";
+    $("#digest-second").hidden = !f.second.checked;
+    $("#btn-digest-test2").hidden = !(f.second.checked && f.mode2.value === "tomorrow");
     $("#digest-options").hidden = !f.enabled.checked;
     $("#digest-email").textContent = (state.session && state.session.user.email) || "deine Registrierungs-Adresse";
   }
 
   $("#form-digest").enabled.addEventListener("change", e => {
     $("#digest-options").hidden = !e.target.checked;
+  });
+  $("#form-digest").addEventListener("change", () => {
+    const f = $("#form-digest");
+    $("#digest-second").hidden = !f.second.checked;
+    $("#btn-digest-test2").hidden = !(f.second.checked && f.mode2.value === "tomorrow");
   });
 
   $("#form-digest").addEventListener("submit", e => {
@@ -438,21 +448,37 @@
       if (f.enabled.checked && time <= nowHm) update.digest_last_sent = today;
       if (f.enabled.checked && time > nowHm) update.digest_last_sent = null;
 
+      // Zweite Mail (Schritt 34)
+      const second = f.enabled.checked && f.second.checked;
+      const time2 = f.time2.value || "18:00";
+      if (second && time2 === time) throw new Error("Bitte für die zweite Mail eine andere Uhrzeit wählen.");
+      const hadSecond = "digest_time2" in (state.profile || {});
+      if (second || hadSecond) {
+        update.digest_time2 = second ? time2 : null;
+        update.digest_mode2 = f.mode2.value === "today" ? "today" : "tomorrow";
+        if (second) update.digest_last_sent2 = time2 <= nowHm ? today : null;
+      }
+
       const { error } = await sb.from("profiles").update(update).eq("id", state.session.user.id);
-      if (error) throw error;
+      if (error) {
+        if (/digest_(time2|mode2|last_sent2)/.test(error.message || "")) throw new Error("Für die zweite Mail bitte zuerst das SQL aus Schritt 34 in Supabase ausführen.");
+        throw error;
+      }
       Object.assign(state.profile, update);
-      toast(f.enabled.checked
-        ? `Gespeichert – die Zusammenfassung kommt täglich gegen ${time} Uhr.`
-        : "Gespeichert – keine täglichen Mails mehr.");
+      toast(!f.enabled.checked
+        ? "Gespeichert – keine täglichen Mails mehr."
+        : second
+          ? `Gespeichert – die Zusammenfassung kommt täglich gegen ${time} und ${time2} Uhr.`
+          : `Gespeichert – die Zusammenfassung kommt täglich gegen ${time} Uhr.`);
     });
   });
 
-  $("#btn-digest-test").addEventListener("click", async () => {
-    const btn = $("#btn-digest-test");
+  async function digestTest(btn, mode) {
+    const label = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Wird gesendet …";
     try {
-      const { data, error } = await sb.functions.invoke("digest", { body: { action: "test" } });
+      const { data, error } = await sb.functions.invoke("digest", { body: { action: "test", mode } });
       if (error) {
         let msg = error.message;
         let status = "";
@@ -477,9 +503,11 @@
       toast(translateError(err), true);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Testmail jetzt senden";
+      btn.textContent = label;
     }
-  });
+  }
+  $("#btn-digest-test").addEventListener("click", e => digestTest(e.currentTarget, "today"));
+  $("#btn-digest-test2").addEventListener("click", e => digestTest(e.currentTarget, "tomorrow"));
 
   $("#btn-copy-code").addEventListener("click", async () => {
     const code = state.household && state.household.invite_code;
