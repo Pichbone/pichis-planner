@@ -1477,3 +1477,36 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 
 /* Offline-Hinweis */
 .offline-bar { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: var(--amber-soft, #F7EBCB); color: var(--ink); font-size: .88rem; font-weight: 500; }
+
+/* =========================================================
+   Dokumentenarchiv
+   ========================================================= */
+:root { --archive: #7C5A2B; --archive-soft: #F1E7D6; }
+@media (prefers-color-scheme: dark) { :root { --archive: #D9B47A; --archive-soft: #2E261B; } }
+.tile-archive { border-color: var(--archive); background: var(--archive-soft); }
+.tile-archive .tile-status { color: var(--archive); }
+.ar-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ar-doc { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: inherit; font: inherit; cursor: pointer; }
+.ar-doc:active { transform: scale(.99); }
+.ar-icon { font-size: 1.5rem; line-height: 1.2; flex-shrink: 0; }
+.ar-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ar-title { font-weight: 600; overflow-wrap: anywhere; }
+.ar-sub { font-size: .8rem; color: var(--muted); }
+#ar-status .banner { margin-bottom: 12px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+#ar-footer { margin: 14px 2px; }
+#ar-detail { margin-bottom: 12px; }
+
+/* Tags verwalten */
+.tg-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.tg-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.tg-row .tag { flex-shrink: 0; }
+.tg-count { flex: 1; font-size: .8rem; color: var(--muted); text-align: right; }
+.tg-edit { font-size: .85rem; opacity: .6; }
+.tg-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.tg-swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); background: var(--sw); cursor: pointer; padding: 0; position: relative; overflow: hidden; }
+.tg-swatch.on { box-shadow: 0 0 0 3px var(--ink); }
+.tg-custom { background: conic-gradient(#E0703F, #B7791F, #2F5D50, #3B6EA5, #8E5BB5, #BE185D, #E0703F); }
+.tg-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.tg-preview { margin: 0; }
+#tg-merge-row .inline-form select { flex: 1; min-width: 0; }
+#sheet-tag { z-index: 30; }   /* öffnet sich über den Einstellungen */

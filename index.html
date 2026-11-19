@@ -188,6 +188,11 @@
           <div class="tile-name">Notizen</div>
           <div class="tile-status" id="tile-note-status">Öffnen</div>
         </a>
+        <a class="tile tile-active tile-archive" href="#/archiv">
+          <div class="tile-icon">🗄️</div>
+          <div class="tile-name">Archiv</div>
+          <div class="tile-status" id="tile-ar-status">HiDrive</div>
+        </a>
         <a class="tile tile-active tile-news" href="#/news">
           <div class="tile-icon">🌍</div>
           <div class="tile-name">News</div>
@@ -361,6 +366,20 @@
 
       <input type="search" id="jn-search" class="jn-search" placeholder="Tagebuch durchsuchen" aria-label="Tagebuch durchsuchen" autocomplete="off">
       <div id="jn-items"></div>
+     </div>
+
+     <!-- ===== Dokumentenarchiv ===== -->
+     <div id="view-archive" class="view" hidden>
+      <div id="ar-status"></div>
+      <div class="note-toolbar">
+        <input type="search" id="ar-search" placeholder="Dokumente durchsuchen – auch im Text" aria-label="Archiv durchsuchen" autocomplete="off">
+        <button class="icon-btn icon-btn-accent" id="btn-ar-add" aria-label="Dokument ablegen" hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div class="chips" id="ar-chips"></div>
+      <div id="ar-items"></div>
+      <div id="ar-footer"></div>
      </div>
 
      <!-- ===== News ===== -->
@@ -798,6 +817,60 @@
     <span class="jn-viewer-close">✕</span>
   </div>
 
+  <!-- Archiv: Dokument -->
+  <div id="sheet-archive" class="sheet sheet-tall" hidden role="dialog" aria-label="Dokument">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="ar-sheet-title">Dokument ablegen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="ar-file-block">
+      <ul class="file-list" id="ar-files"></ul>
+      <button type="button" class="btn btn-secondary btn-block" id="btn-ar-pick">📎 Datei oder Foto auswählen</button>
+      <input type="file" id="ar-file-input" multiple hidden>
+      <p class="muted small">PDFs werden beim Ablegen durchsucht, damit die Suche auch den Inhalt findet. Bei eingescannten PDFs und Fotos geht das nicht.</p>
+    </div>
+    <div id="ar-detail" hidden>
+      <p class="muted small" id="ar-detail-file"></p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary btn-small" id="btn-ar-open">📄 Öffnen</button>
+        <button type="button" class="btn btn-small" id="btn-ar-share">↗︎ Teilen / Sichern</button>
+      </div>
+    </div>
+    <form id="form-ar" class="form" autocomplete="off">
+      <label id="ar-title-row">Titel
+        <input type="text" name="title" maxlength="200" placeholder="z. B. Kfz-Versicherung HUK 2026">
+      </label>
+      <p class="muted small" id="ar-multi-hint" hidden>Mehrere Dateien: Der Titel wird jeweils aus dem Dateinamen gebildet – Kategorie, Datum und Tags gelten für alle.</p>
+      <div class="form-row form-row-even">
+        <label>Kategorie
+          <input type="text" name="category" maxlength="60" list="ar-cats" placeholder="z. B. Versicherungen">
+          <datalist id="ar-cats"></datalist>
+        </label>
+        <label>Datum des Dokuments
+          <input type="date" name="doc_date">
+        </label>
+      </div>
+      <label>Notiz <span class="hint">(optional)</span>
+        <textarea name="notes" rows="2" maxlength="2000" placeholder="z. B. Vertragsnummer, Kündigungsfrist"></textarea>
+      </label>
+      <div>
+        <span class="field-label">Tags</span>
+        <div class="chip-wrap" id="ar-edit-tags"></div>
+        <div class="inline-form">
+          <input type="text" name="new_tag" maxlength="40" placeholder="Neuer Tag" aria-label="Neuer Tag">
+          <button type="button" class="btn btn-small" id="btn-ar-tag-add">Anlegen</button>
+        </div>
+      </div>
+      <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      <button type="submit" class="btn btn-primary btn-block" id="btn-ar-save">Ablegen</button>
+    </form>
+    <div class="note-actions">
+      <span></span>
+      <button type="button" class="link danger-link" id="btn-ar-delete">Löschen</button>
+    </div>
+  </div>
+
   <!-- ICS-Import -->
   <div id="sheet-ics" class="sheet sheet-tall" hidden role="dialog" aria-label="ICS-Datei importieren">
     <div class="sheet-handle"></div>
@@ -844,6 +917,39 @@
       <ul class="bd-import-list" id="ics-list"></ul>
       <button type="button" class="btn btn-primary btn-block" id="btn-ics-go">Übernehmen</button>
       <button type="button" class="link ics-back" id="btn-ics-back">‹ Andere Datei wählen</button>
+    </div>
+  </div>
+
+  <!-- Tag bearbeiten -->
+  <div id="sheet-tag" class="sheet" hidden role="dialog" aria-label="Tag bearbeiten">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Tag bearbeiten</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-tag" class="form" autocomplete="off">
+      <label>Name
+        <input type="text" name="name" maxlength="40" required>
+      </label>
+      <div>
+        <span class="field-label">Farbe</span>
+        <div class="tg-colors" id="tg-colors"></div>
+      </div>
+      <p class="tg-preview" id="tg-preview"></p>
+      <p class="muted small" id="tg-usage"></p>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div id="tg-merge-row">
+      <h3 class="sheet-sub">Zusammenführen</h3>
+      <div class="inline-form">
+        <select id="tg-merge" aria-label="Zusammenführen mit"></select>
+        <button type="button" class="btn btn-small" id="btn-tg-merge">Zusammenführen</button>
+      </div>
+      <p class="muted small">Praktisch bei doppelten Tags wie „DJ“ und „Dj-Gigs“: Alle Einträge bekommen den gewählten Tag, dieser hier verschwindet.</p>
+    </div>
+    <div class="note-actions">
+      <span></span>
+      <button type="button" class="link danger-link" id="btn-tg-delete">Tag löschen</button>
     </div>
   </div>
 
@@ -1469,6 +1575,16 @@
     </div>
 
     <div class="panel-section">
+      <h3>🏷️ Tags</h3>
+      <p class="muted small">Gilt für die ganze Familie – in Kalender, Aufgaben, Notizen, Einkauf, Geburtstagen, Wiki und Archiv. Antippen zum Umbenennen, Umfärben, Zusammenführen oder Löschen.</p>
+      <ul class="tg-list" id="tags-settings"></ul>
+      <form id="form-tag-new" class="inline-form" autocomplete="off">
+        <input type="text" name="name" maxlength="40" placeholder="Neuer Tag" aria-label="Neuer Tag">
+        <button type="submit" class="btn btn-small">Anlegen</button>
+      </form>
+    </div>
+
+    <div class="panel-section">
       <h3>Startseite</h3>
       <p class="muted small">Kacheln ein- und ausblenden, mit ↑ ↓ sortieren und mit ↔︎ breit anzeigen. Gilt nur für dich – auf all deinen Geräten.</p>
       <ul class="ts-list" id="tiles-settings"></ul>
@@ -1512,6 +1628,21 @@
   <!-- Meldungen -->
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+  <script>
+    // Rückkehr von der STRATO-HiDrive-Anmeldung: Code merken und Adresse aufräumen,
+    // bevor die Anmeldung der App die Adresse liest
+    (function () {
+      var u = new URL(location.href), code = u.searchParams.get("code"), st = u.searchParams.get("state"), err = u.searchParams.get("error");
+      if ((code && st) || err) {
+        try {
+          if (code && st) sessionStorage.setItem("pp_hidrive_cb", JSON.stringify({ code: code, state: st }));
+          if (err) sessionStorage.setItem("pp_hidrive_err", u.searchParams.get("error_description") || err);
+        } catch (e) {}
+        // zurück auf die Startadresse der App (die Rückleitung kommt über /api/hidrive/callback)
+        history.replaceState(null, "", "/#/archiv");
+      }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>
@@ -1536,5 +1667,7 @@
   <script src="/js/icsimport.js"></script>
   <script src="/js/commute.js"></script>
   <script src="/js/backup.js"></script>
+  <script src="/js/archive.js"></script>
+  <script src="/js/tags.js"></script>
 </body>
 </html>

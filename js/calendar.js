@@ -1078,8 +1078,9 @@
     }
     if (t.dataset.delTag) {
       const tag = cal.tags.find(x => x.id === t.dataset.delTag);
-      if (!tag || !confirm(`Tag „${tag.name}“ löschen? Er wird bei allen Terminen entfernt.`)) return;
-      const { error } = await sb.from("event_tags").delete().eq("id", tag.id);
+      if (!tag || !confirm(`Tag „${tag.name}“ löschen? Er wird überall entfernt – bei Terminen, Aufgaben, Notizen usw.`)) return;
+      let { error } = await sb.rpc("delete_tag", { p_tag: tag.id });
+      if (error && /delete_tag|function/i.test(error.message || "")) ({ error } = await sb.from("event_tags").delete().eq("id", tag.id));
       if (error) { toast(PP.translateError(error), true); return; }
       cal.tags = cal.tags.filter(x => x.id !== tag.id);
       if (cal.tagFilter === tag.id) { cal.tagFilter = ""; storageSet("pp_cal_tag", ""); }

@@ -210,7 +210,8 @@
     "wiki": { id: "wiki", title: "Wiki", module: "wiki" },
     "geburtstage": { id: "birthdays", title: "Geburtstage", module: "birthdays" },
     "meintag": { id: "myday", title: "Mein Tag", module: "myday" },
-    "news": { id: "news", title: "News", module: "news" }
+    "news": { id: "news", title: "News", module: "news" },
+    "archiv": { id: "archive", title: "Archiv", module: "archive" }
   };
   let activeView = null;
 
