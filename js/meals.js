@@ -201,7 +201,7 @@
           return `<li><button class="ar-doc" data-recipe="${r.id}">
             <span class="ar-icon">${r.is_favorite ? "⭐" : "🍲"}</span>
             <span class="ar-main"><span class="ar-title">${escapeHtml(r.name)}</span>
-            <span class="ar-sub">für ${r.servings} · ${n} Zutat${n === 1 ? "" : "en"}${r.url ? " · 🔗" : ""}</span></span>
+            <span class="ar-sub">für ${r.servings} · ${n} Zutat${n === 1 ? "" : "en"}${r.url ? " · 🔗" : ""}${r.archive_doc_id ? " · 📄" : ""}</span></span>
           </button></li>`;
         }).join("")}</ul>`
       : `<div class="empty"><div class="empty-icon">📖</div><p><strong>${ml.recipes.length ? "Nichts gefunden." : "Noch keine Rezepte."}</strong></p>
@@ -305,6 +305,7 @@
     $("#recipe-sheet-title").textContent = r ? r.name : "Neues Rezept";
     $("#btn-recipe-delete").hidden = !r;
     $("#recipe-link").innerHTML = r && /^https?:\/\//.test(r.url) ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">🔗 Rezept im Netz öffnen</a>` : "";
+    $("#recipe-original").hidden = !(r && r.archive_doc_id && PP.archiveDoc);
     previewIngredients();
     openSheet("sheet-recipe");
     if (!r) setTimeout(() => f.name.focus(), 60);
@@ -352,6 +353,11 @@
       await Promise.all([loadRecipes(), loadWeek()]);
       render();
     });
+  });
+
+  $("#btn-recipe-original").addEventListener("click", () => {
+    const r = ml.editRecipe;
+    if (r && r.archive_doc_id && PP.archiveDoc) PP.archiveDoc.preview(r.archive_doc_id, "sheet-recipe");
   });
 
   $("#btn-recipe-delete").addEventListener("click", async () => {

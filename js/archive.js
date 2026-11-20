@@ -24,6 +24,7 @@
     tags: [],
     filter: storageGet("pp_ar_filter") || "",
     tagFilter: storageGet("pp_ar_tag") || "",
+    recipeLinks: new Map(),   // Archiv-Dokument → Rezept im Essensplan
     folders: [],          // Unterordner in HiDrive = Kategorien
     ai: storageGet("pp_ar_ai") !== "0",   // KI-Vorschläge beim Ablegen
     textCache: new Map(), // Datei → { text, pages } (schon ausgelesen)
@@ -69,6 +70,9 @@
     const d = /^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) ? `${date} ` : "";
     return `${d}${t}${ext}`;
   }
+  const isRecipeCat = c => /rezept/i.test(c || "");
+  // Rezepte ohne Datum im Namen („Lasagne Bolognese.pdf“)
+  const nameFor = (title, date, category, oldName) => fileNameFor(title, isRecipeCat(category) ? null : date, oldName);
   const sameName = (cur, want) => cur === want || cur.replace(/ \(\d+\)(\.[^.]*)?$/, "$1") === want;
 
   // „2026-10-02 Rechnung.pdf“, „20261002_Rechnung.pdf“, „02.10.2026 Rechnung.pdf“ → Datum + Titel
@@ -146,6 +150,9 @@
     if (d.error) throw d.error;
     ar.docs = d.data;
     ar.tags = t.error ? [] : t.data;
+    // Welche Rezept-Dokumente sind schon im Essensplan? (Schritt 35)
+    const r = await sb.from("recipes").select("id, archive_doc_id").eq("household_id", hid()).not("archive_doc_id", "is", null);
+    ar.recipeLinks = new Map(r.error ? [] : r.data.map(x => [x.archive_doc_id, x.id]));
   }
 
   function subscribe() {
@@ -174,7 +181,7 @@
 
   function row(d, snippet) {
     const tags = (d.tag_ids || []).map(id => ar.tags.find(t => t.id === id)).filter(Boolean);
-    const sub = [d.category, dateText(d.doc_date), sizeText(d.size)].filter(Boolean).map(escapeHtml).join(" · ");
+    const sub = [d.category, dateText(d.doc_date), sizeText(d.size)].filter(Boolean).map(escapeHtml).join(" · ") + (ar.recipeLinks.has(d.id) ? " · 🍽️" : "");
     return `<li><button class="ar-doc" data-ar-doc="${d.id}">
       <span class="ar-icon">${fileIcon(d.mime || "")}</span>
       <span class="ar-main">
@@ -239,8 +246,10 @@
       ? usedTags.map(t => `<button class="chip chip-tag${ar.tagFilter === t.id ? " active" : ""}" data-ar-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)} <span class="chip-count">${inCat.filter(d => (d.tag_ids || []).includes(t.id)).length}</span></button>`).join("")
       : "";
     const list = ar.tagFilter ? inCat.filter(d => (d.tag_ids || []).includes(ar.tagFilter)) : inCat;
+    const openRecipes = isRecipeCat(ar.filter) ? list.filter(d => !ar.recipeLinks.has(d.id)).length : 0;
     $("#ar-items").innerHTML = list.length
-      ? `<ul class="ar-list">${list.map(d => row(d)).join("")}</ul>`
+      ? (openRecipes ? `<div class="ar-recipe-bar"><span>🍽️ ${openRecipes} Rezept${openRecipes === 1 ? "" : "e"} noch nicht im Essensplan</span><button class="btn btn-small" id="btn-ar-recipes-all">Alle übernehmen</button></div>` : "") +
+        `<ul class="ar-list">${list.map(d => row(d)).join("")}</ul>`
       : (ar.status && ar.status.connected ? `<div class="empty"><div class="empty-icon">🗄️</div>
           <p><strong>Noch keine Dokumente.</strong></p>
           <p class="muted small">Mit dem orangen + Verträge, Rechnungen oder Bescheide ablegen. Der Text in PDFs wird automatisch durchsuchbar.</p></div>` : "");
@@ -279,6 +288,58 @@
       document.head.appendChild(s);
     });
   }
+  // ---------- Word (.docx) lesen – ohne Bibliothek ----------
+  // .docx ist ein ZIP-Archiv; der Text steht in word/document.xml
+  async function zipEntry(buf, wanted) {
+    const dv = new DataView(buf);
+    let eocd = -1;
+    for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error("Keine gültige Word-Datei.");
+    const count = dv.getUint16(eocd + 10, true);
+    let p = dv.getUint32(eocd + 16, true);
+    for (let n = 0; n < count; n++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+      const nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+      const off = dv.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(new Uint8Array(buf, p + 46, nlen));
+      if (name === wanted) {
+        const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+        const data = new Uint8Array(buf, start, csize);
+        if (method === 0) return new TextDecoder().decode(data);
+        if (method === 8) {
+          const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+          return new TextDecoder().decode(out);
+        }
+        throw new Error("Unbekannte Komprimierung in der Word-Datei.");
+      }
+      p += 46 + nlen + elen + clen;
+    }
+    return null;
+  }
+  async function docxText(blob) {
+    const xml = await zipEntry(await blob.arrayBuffer(), "word/document.xml");
+    if (!xml) return "";
+    return xml
+      .replace(/<w:tab\/>/g, "\t").replace(/<w:br\/>|<w:cr\/>/g, "\n").replace(/<\/w:p>/g, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&")
+      .replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, MAX_TEXT);
+  }
+  const isDocx = (name, mime) => /\.docx$/i.test(name || "") || /wordprocessingml/.test(mime || "");
+  const isPlain = (name, mime) => /^text\//.test(mime || "") || /\.(txt|md|csv)$/i.test(name || "");
+
+  // Text aus PDF, Word oder Textdatei – { text, pages }
+  async function extractText(blob, name, mime, progress = () => {}) {
+    if (/pdf/i.test(mime || "") || /\.pdf$/i.test(name || "")) return pdfText(blob, progress);
+    if (isDocx(name, mime)) return { text: await docxText(blob), pages: null };
+    if (isPlain(name, mime) && blob.size < 2 * 1024 * 1024) return { text: (await blob.text()).slice(0, MAX_TEXT), pages: null };
+    return { text: "", pages: null };
+  }
+  const canRead = (name, mime) => /pdf/i.test(mime || "") || /\.pdf$/i.test(name || "") || isDocx(name, mime) || isPlain(name, mime);
+
   async function pdfText(file, progress) {
     await loadScript(PDFJS);
     const lib = window.pdfjsLib;
@@ -403,9 +464,7 @@
 
   async function readPending(file) {
     if (ar.textCache.has(file)) return ar.textCache.get(file);
-    let r = { text: "", pages: null };
-    if (/pdf/i.test(file.type) || /\.pdf$/i.test(file.name)) r = await pdfText(file, (i, total) => aiStatus(`📖 Text wird gelesen … ${i}/${total}`));
-    else if (/^text\//.test(file.type) && file.size < 2 * 1024 * 1024) r = { text: (await file.text()).slice(0, MAX_TEXT), pages: null };
+    const r = await extractText(file, file.name, file.type, (i, total) => aiStatus(`📖 Text wird gelesen … ${i}/${total}`));
     ar.textCache.set(file, r);
     return r;
   }
@@ -414,7 +473,7 @@
   async function autoSuggest() {
     if (!ar.ai || ar.editing || ar.pending.length !== 1) { aiStatus(""); return; }
     const file = ar.pending[0];
-    if (!(/pdf/i.test(file.type) || /\.pdf$/i.test(file.name) || /^text\//.test(file.type))) { aiStatus(""); return; }
+    if (!canRead(file.name, file.type)) { aiStatus(""); return; }
     const token = ++ar.aiToken;
     try {
       const { text } = await readPending(file);
@@ -505,6 +564,8 @@
     ar.aiToken++;
     aiStatus("");
     $("#btn-ar-ai").hidden = !d.has_text;
+    $("#btn-ar-recipe").hidden = !isRecipeCat(d.category);
+    $("#btn-ar-recipe").textContent = ar.recipeLinks.has(d.id) ? "🍽️ Im Essensplan ✓ – neu auslesen" : "🍽️ In den Essensplan übernehmen";
     $("#ar-detail-file").innerHTML = `${fileIcon(d.mime || "")} ${escapeHtml(d.file_name)} · ${sizeText(d.size)}${d.pages ? ` · ${d.pages} Seiten` : ""}` +
       (/pdf/.test(d.mime || "") ? (d.has_text ? " · durchsuchbar ✓" : " · kein Text (eingescannt)") : "");
     $("#btn-ar-save").textContent = "Speichern";
@@ -547,6 +608,18 @@
     } else if (b.dataset.arCat !== undefined) {
       $("#form-ar").category.value = b.dataset.arCat;
       renderCats();
+    } else if (b.id === "btn-ar-recipe") {
+      const d = ar.editing;
+      b.disabled = true;
+      aiStatus("🍽️ Rezept wird ausgelesen …");
+      try {
+        const r = await toRecipe(d, msg => aiStatus(msg));
+        aiStatus(`🍽️ „${r.name}“ ist im Essensplan – ${r.count} Zutaten.`, "ok");
+        b.textContent = "🍽️ Im Essensplan ✓ – neu auslesen";
+        render();
+      } catch (err) {
+        aiStatus(`Rezept nicht übernommen: ${err.message}`, "warn");
+      } finally { b.disabled = false; }
     } else if (b.id === "btn-ar-ai") {
       const d = ar.editing;
       b.disabled = true;
@@ -617,7 +690,7 @@
         const title = f.title.value.trim();
         if (!title) throw new Error("Bitte einen Titel eingeben.");
         const d0 = ar.editing;
-        const wantName = fileNameFor(title, meta.doc_date, d0.file_name);
+        const wantName = nameFor(title, meta.doc_date, meta.category, d0.file_name);
         if (ar.status && ar.status.connected &&
             (meta.category !== d0.category || !sameName(d0.file_name, wantName))) {
           // Datei in HiDrive in den Ordner der Kategorie verschieben und nach Datum + Titel benennen
@@ -643,19 +716,16 @@
           const isPdf = /pdf/i.test(file.type) || /\.pdf$/i.test(file.name);
           if (ar.textCache.has(file)) {
             ({ text, pages } = ar.textCache.get(file));
-          } else if (isPdf) {
+          } else if (canRead(file.name, file.type)) {
             try {
-              const r = await pdfText(file, (i, total) => { btn.textContent = `Text wird gelesen${n} … ${i}/${total}`; });
-              text = r.text; pages = r.pages;
-            } catch (err) { console.warn("PDF-Text:", err); }
-          } else if (/^text\//.test(file.type) && file.size < 2 * 1024 * 1024) {
-            text = (await file.text()).slice(0, MAX_TEXT);
+              ({ text, pages } = await extractText(file, file.name, file.type, (i, total) => { btn.textContent = `Text wird gelesen${n} … ${i}/${total}`; }));
+            } catch (err) { console.warn("Text:", err); }
           }
           btn.textContent = `Wird in HiDrive abgelegt${n} …`;
           const parts = splitName(file.name);
           const title = (ar.pending.length === 1 && f.title.value.trim()) || parts.title;
           const date = meta.doc_date || parts.date;
-          const up = await uploadFile(file, meta.category, fileNameFor(title, date, file.name));
+          const up = await uploadFile(file, meta.category, nameFor(title, date, meta.category, file.name));
           const { error } = await sb.from("archive_docs").insert({
             household_id: hid(), ...meta, doc_date: date, is_private: !!meta.is_private,
             title: title.slice(0, 200), file_name: (up.name || file.name).slice(0, 255), file_path: up.path,
@@ -718,6 +788,7 @@
     }
     if (b.id === "btn-ar-connect" || b.id === "btn-ar-relogin") { openConnect(); return; }
     if (b.id === "btn-ar-import") { openImport(); return; }
+    if (b.id === "btn-ar-recipes-all") { recipesAll(b); return; }
     if (b.id === "btn-ar-rename-all") { renameAll(b); return; }
     if (b.id === "btn-ar-disconnect") {
       if (!confirm("HiDrive-Verbindung trennen? Die Dateien bleiben in HiDrive, sind in der App aber erst nach dem erneuten Verbinden wieder abrufbar.")) return;
@@ -733,12 +804,118 @@
       : "";
   }
 
+  // ---------- Rezepte → Essensplan ----------
+  // Foto (auch HEIC in Safari) als verkleinertes JPEG für die KI
+  async function imageForAi(blob) {
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      try { await img.decode(); } catch { throw new Error("Dieses Bild kann der Browser nicht lesen (HEIC? – bitte in Safari öffnen oder als JPEG ablegen)."); }
+      return drawJpeg(img, img.naturalWidth, img.naturalHeight);
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function drawJpeg(src, w, h) {
+    const s = Math.min(1, 1568 / Math.max(w, h));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * s); c.height = Math.round(h * s);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(src, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+  }
+  // Eingescannte PDF ohne Text: erste Seite als Bild
+  async function pdfPageImage(blob) {
+    await loadScript(PDFJS);
+    const lib = window.pdfjsLib;
+    lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+    const pdf = await lib.getDocument({ data: await blob.arrayBuffer() }).promise;
+    const page = await pdf.getPage(1);
+    const v1 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: 1568 / Math.max(v1.width, v1.height) });
+    const c = document.createElement("canvas");
+    c.width = vp.width; c.height = vp.height;
+    await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+    return drawJpeg(c, c.width, c.height);
+  }
+
+  async function recipeSource(doc, status) {
+    const { data } = await sb.from("archive_docs").select("text_content").eq("id", doc.id).single();
+    const stored = (data && data.text_content) || "";
+    if (stored.trim().length >= 40) return { text: stored };
+    const mime = doc.mime || "";
+    status("📥 Datei wird aus HiDrive geladen …");
+    const blob = await downloadBlob(doc);
+    if (/^image\//.test(mime) || /\.(jpe?g|png|heic|heif|webp|gif)$/i.test(doc.file_name)) return { image: await imageForAi(blob) };
+    if (canRead(doc.file_name, mime)) {
+      const r = await extractText(blob, doc.file_name, mime);
+      if (r.text.trim().length >= 40) {
+        // gleich für die Suche merken
+        sb.from("archive_docs").update({ text_content: r.text, pages: r.pages }).eq("id", doc.id).then(() => {});
+        return { text: r.text };
+      }
+      if (/pdf/i.test(mime) || /\.pdf$/i.test(doc.file_name)) return { image: await pdfPageImage(blob) };
+    }
+    throw new Error("Aus diesem Dateityp lässt sich kein Rezept lesen (z. B. alte .doc-Dateien – bitte als .docx oder PDF speichern).");
+  }
+
+  async function toRecipe(doc, status = () => {}) {
+    const src = await recipeSource(doc, status);
+    status(src.image ? "✨ KI liest das Foto …" : "✨ KI liest das Rezept …");
+    const { data, error } = await sb.functions.invoke("assist", { body: { action: "recipe", ...src, file_name: doc.file_name } });
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+      throw new Error(msg);
+    }
+    const row = {
+      name: data.name.slice(0, 120), servings: data.servings,
+      ingredients: (data.ingredients || []).map(s => s.slice(0, 120)).join("\n").slice(0, 5000),
+      instructions: (data.instructions || "").slice(0, 20000), archive_doc_id: doc.id
+    };
+    const known = ar.recipeLinks.get(doc.id);
+    let res;
+    if (known) res = await sb.from("recipes").update(row).eq("id", known).select("id").single();
+    else res = await sb.from("recipes").insert({ ...row, household_id: hid() }).select("id").single();
+    if (res.error) {
+      if (/archive_doc_id/.test(res.error.message || "")) throw new Error("Bitte zuerst das SQL aus Schritt 35 in Supabase ausführen.");
+      if (/recipes/.test(res.error.message || "")) throw new Error("Bitte zuerst das SQL aus Schritt 32 in Supabase ausführen.");
+      throw res.error;
+    }
+    ar.recipeLinks.set(doc.id, res.data.id);
+    return { name: row.name, count: (data.ingredients || []).length };
+  }
+
+  async function recipesAll(btn) {
+    const todo = ar.docs.filter(d => d.category === ar.filter && !ar.recipeLinks.has(d.id));
+    if (!todo.length) return;
+    if (!confirm(`${todo.length} Rezept${todo.length === 1 ? "" : "e"} von der KI auslesen und in den Essensplan übernehmen?`)) return;
+    btn.disabled = true;
+    let ok = 0;
+    const bad = [];
+    for (const d of todo) {
+      btn.textContent = `${ok + bad.length + 1}/${todo.length} …`;
+      try { await toRecipe(d); ok++; } catch (err) { console.warn(d.file_name, err); bad.push(`${d.title}: ${err.message}`); }
+    }
+    render();
+    toast(bad.length ? `${ok} übernommen, ${bad.length} nicht: ${bad.slice(0, 2).join(" · ")}${bad.length > 2 ? " …" : ""}` : `${ok} Rezept${ok === 1 ? "" : "e"} im Essensplan.`, !!bad.length);
+  }
+
+  // Für den Essensplan: Original eines Rezepts anzeigen
+  PP.archiveDoc = {
+    async preview(docId, back) {
+      const { data: doc, error } = await sb.from("archive_docs").select("id, title, mime, file_name").eq("id", docId).maybeSingle();
+      if (error || !doc) { toast("Das Original ist im Archiv nicht mehr vorhanden.", true); return; }
+      showPreview(doc.title, () => downloadBlob(doc), doc.mime, back);
+    }
+  };
+
   // ---------- Alle Dateinamen an Datum + Titel angleichen ----------
   async function renameAll(btn) {
-    const todo = ar.docs.filter(d => !sameName(d.file_name, fileNameFor(d.title, d.doc_date, d.file_name)));
+    const todo = ar.docs.filter(d => !sameName(d.file_name, nameFor(d.title, d.doc_date, d.category, d.file_name)));
     if (!todo.length) { toast("Alle Dateinamen passen schon zu Datum und Titel."); return; }
     const ex = todo[0];
-    if (!confirm(`${todo.length} Datei${todo.length === 1 ? "" : "en"} in HiDrive umbenennen?\n\nBeispiel:\n${ex.file_name}\n→ ${fileNameFor(ex.title, ex.doc_date, ex.file_name)}`)) return;
+    if (!confirm(`${todo.length} Datei${todo.length === 1 ? "" : "en"} in HiDrive umbenennen?\n\nBeispiel:\n${ex.file_name}\n→ ${nameFor(ex.title, ex.doc_date, ex.category, ex.file_name)}`)) return;
     btn.disabled = true;
     let ok = 0, bad = 0;
     for (const d of todo) {
@@ -843,17 +1020,11 @@
         const n = `${done + failed.length + 1}/${chosen.length}`;
         const mime = mimeOf(file);
         let text = "", pages = null;
-        const isPdf = /pdf/.test(mime);
-        if ((isPdf && file.size <= 30 * 1024 * 1024) || (/^text\//.test(mime) && file.size < 2 * 1024 * 1024)) {
+        if (canRead(file.name, mime) && file.size <= 30 * 1024 * 1024) {
           try {
             btn.textContent = `Wird gelesen ${n} …`;
             const blob = await fetchBlob(file.path);
-            if (isPdf) {
-              const r = await pdfText(blob, (i, total) => { btn.textContent = `Text wird gelesen ${n} … ${i}/${total}`; });
-              text = r.text; pages = r.pages;
-            } else {
-              text = (await blob.text()).slice(0, MAX_TEXT);
-            }
+            ({ text, pages } = await extractText(blob, file.name, mime, (i, total) => { btn.textContent = `Text wird gelesen ${n} … ${i}/${total}`; }));
           } catch (err) { console.warn("Text:", err); }
         }
         const parts = splitName(file.name);
@@ -875,7 +1046,7 @@
         if (error) { console.warn(error); failed.push(file.name); continue; }
         done++;
         const wrongFolder = category !== (file.folder || "");
-        const wrongName = f.rename.checked && !sameName(row.file_name, fileNameFor(row.title, row.doc_date, row.file_name));
+        const wrongName = f.rename.checked && !sameName(row.file_name, nameFor(row.title, row.doc_date, category, row.file_name));
         if (wrongFolder || wrongName) {
           btn.textContent = `Wird einsortiert ${n} …`;
           try { await call(f.rename.checked ? "place" : "move", { doc_id: row.id, category }); } catch (err) { console.warn("Einsortieren:", err); }
