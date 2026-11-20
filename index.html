@@ -939,6 +939,25 @@
   </div>
 
   <!-- Archiv: Dokument -->
+  <div id="sheet-ar-import" class="sheet sheet-tall" hidden role="dialog" aria-label="Aus HiDrive übernehmen">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Aus HiDrive übernehmen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <p class="muted small" id="ar-imp-info"></p>
+    <ul class="ar-imp-list" id="ar-imp-list"></ul>
+    <form id="form-ar-import" class="form" autocomplete="off">
+      <div id="ar-imp-opts">
+        <span class="field-label">Tags für alle ausgewählten</span>
+        <div class="chips" id="ar-imp-tags"></div>
+        <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+        <p class="muted small">Kategorie = Unterordner in HiDrive, Titel = Dateiname, Datum = Änderungsdatum. Alles lässt sich danach beim Dokument ändern. Bei PDFs wird der Text für die Suche gelesen.</p>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-ar-imp">Übernehmen</button>
+      </div>
+    </form>
+  </div>
+
   <div id="sheet-hidrive" class="sheet" hidden role="dialog" aria-label="HiDrive verbinden">
     <div class="sheet-handle"></div>
     <div class="panel-head">

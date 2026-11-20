@@ -499,6 +499,7 @@
       return;
     }
     if (b.id === "btn-ar-connect" || b.id === "btn-ar-relogin") { openConnect(); return; }
+    if (b.id === "btn-ar-import") { openImport(); return; }
     if (b.id === "btn-ar-disconnect") {
       if (!confirm("HiDrive-Verbindung trennen? Die Dateien bleiben in HiDrive, sind in der App aber erst nach dem erneuten Verbinden wieder abrufbar.")) return;
       try { await call("disconnect"); ar.status = { ...ar.status, connected: false }; render(); renderFooter(); toast("Verbindung getrennt."); }
@@ -509,9 +510,130 @@
   function renderFooter() {
     const s = ar.status;
     $("#ar-footer").innerHTML = s && s.connected
-      ? `<p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
+      ? `<p class="ar-imp-cta"><button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button></p><p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
       : "";
   }
+
+  // ---------- Aus HiDrive übernehmen ----------
+  const imp = { files: [], picked: new Set(), tags: new Set(), busy: false };
+  const MIME = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", heic: "image/heic", gif: "image/gif", webp: "image/webp",
+    txt: "text/plain", csv: "text/csv", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", pages: "application/vnd.apple.pages", zip: "application/zip" };
+  const mimeOf = f => {
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    return MIME[ext] || (f.type && !/directory/i.test(f.type) ? f.type : "");
+  };
+  const titleOf = name => name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim() || name;
+
+  function renderImport() {
+    const list = $("#ar-imp-list");
+    if (!imp.files.length) {
+      list.innerHTML = "";
+      $("#ar-imp-opts").hidden = true;
+      return;
+    }
+    list.innerHTML = imp.files.map((f, i) => `<li><label class="ar-imp-row">
+        <input type="checkbox" data-imp="${i}"${imp.picked.has(i) ? " checked" : ""}>
+        <span class="file-icon">${fileIcon(mimeOf(f))}</span>
+        <span class="ar-imp-text"><span class="ar-imp-name">${escapeHtml(f.name)}</span>
+        <span class="muted small">${escapeHtml(f.folder || "Sonstiges")} · ${escapeHtml(sizeText(f.size))}${f.modified ? " · " + escapeHtml(dateText(f.modified.slice(0, 10))) : ""}</span></span>
+      </label></li>`).join("");
+    $("#ar-imp-tags").innerHTML = ar.tags.length
+      ? ar.tags.map(t => `<button type="button" class="chip chip-tag${imp.tags.has(t.id) ? " active" : ""}" data-imp-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)}</button>`).join("")
+      : `<span class="muted small">Noch keine Tags.</span>`;
+    $("#ar-imp-opts").hidden = false;
+    $("#btn-ar-imp").textContent = imp.picked.size ? `${imp.picked.size} übernehmen` : "Nichts ausgewählt";
+    $("#btn-ar-imp").disabled = !imp.picked.size || imp.busy;
+  }
+
+  async function openImport() {
+    imp.files = []; imp.picked = new Set(); imp.tags = new Set();
+    $("#form-ar-import").reset();
+    $("#ar-imp-info").textContent = "HiDrive-Ordner wird durchsucht …";
+    renderImport();
+    openSheet("sheet-ar-import");
+    try {
+      const r = await call("scan");
+      imp.files = r.files || [];
+      imp.picked = new Set(imp.files.map((_, i) => i));
+      $("#ar-imp-info").textContent = imp.files.length
+        ? `${imp.files.length} neue Datei${imp.files.length === 1 ? "" : "en"} im Ordner „${(r.root || "").split("/").pop()}“ gefunden.`
+        : `Keine neuen Dateien – alles im Ordner „${(r.root || "").split("/").pop()}“ ist schon im Archiv.`;
+    } catch (err) {
+      $("#ar-imp-info").textContent = err.message;
+    }
+    renderImport();
+  }
+
+  async function fetchBlob(path) {
+    const res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/hidrive`, {
+      method: "POST",
+      headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fetch", path })
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || `Lesen fehlgeschlagen (${res.status}).`); }
+    return await res.blob();
+  }
+
+  $("#sheet-ar-import").addEventListener("change", e => {
+    const c = e.target.closest("[data-imp]");
+    if (!c) return;
+    const i = +c.dataset.imp;
+    c.checked ? imp.picked.add(i) : imp.picked.delete(i);
+    renderImport();
+  });
+  $("#sheet-ar-import").addEventListener("click", e => {
+    const t = e.target.closest("[data-imp-tag]");
+    if (!t) return;
+    const id = t.dataset.impTag;
+    imp.tags.has(id) ? imp.tags.delete(id) : imp.tags.add(id);
+    renderImport();
+  });
+
+  $("#form-ar-import").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (imp.busy || !imp.picked.size) return;
+    const f = e.target, btn = $("#btn-ar-imp");
+    const chosen = [...imp.picked].sort((a, b) => a - b).map(i => imp.files[i]);
+    imp.busy = true; btn.disabled = true;
+    let done = 0;
+    const failed = [];
+    try {
+      for (const file of chosen) {
+        const n = `${done + failed.length + 1}/${chosen.length}`;
+        const mime = mimeOf(file);
+        let text = "", pages = null;
+        const isPdf = /pdf/.test(mime);
+        if ((isPdf && file.size <= 30 * 1024 * 1024) || (/^text\//.test(mime) && file.size < 2 * 1024 * 1024)) {
+          try {
+            btn.textContent = `Wird gelesen ${n} …`;
+            const blob = await fetchBlob(file.path);
+            if (isPdf) {
+              const r = await pdfText(blob, (i, total) => { btn.textContent = `Text wird gelesen ${n} … ${i}/${total}`; });
+              text = r.text; pages = r.pages;
+            } else {
+              text = (await blob.text()).slice(0, MAX_TEXT);
+            }
+          } catch (err) { console.warn("Text:", err); }
+        }
+        btn.textContent = `Wird übernommen ${n} …`;
+        const { error } = await sb.from("archive_docs").insert({
+          household_id: hid(), title: titleOf(file.name).slice(0, 200), category: (file.folder || "Sonstiges").slice(0, 60),
+          doc_date: file.modified ? file.modified.slice(0, 10) : null, notes: "",
+          tag_ids: [...imp.tags].filter(id => ar.tags.some(t => t.id === id)), is_private: f.is_private.checked,
+          file_name: file.name.slice(0, 255), file_path: file.path, size: file.size || 0, mime, pages, text_content: text
+        });
+        if (error) { console.warn(error); failed.push(file.name); } else done++;
+      }
+    } finally {
+      imp.busy = false;
+      if (done) { await loadAll(); render(); }
+    }
+    closeSheets();
+    toast(failed.length
+      ? `${done} übernommen, ${failed.length} fehlgeschlagen: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " …" : ""}`
+      : `${done} Dokument${done === 1 ? "" : "e"} übernommen.`, !!failed.length);
+  });
 
   // ---------- Modul ----------
   PP.modules.archive = {
