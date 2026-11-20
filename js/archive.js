@@ -24,7 +24,11 @@
     tags: [],
     filter: storageGet("pp_ar_filter") || "",
     tagFilter: storageGet("pp_ar_tag") || "",
-    folders: [],          // Unterordner in HiDrive = Kategorien   // z. B. Person oder „Steuer 2026“
+    folders: [],          // Unterordner in HiDrive = Kategorien
+    ai: storageGet("pp_ar_ai") !== "0",   // KI-Vorschläge beim Ablegen
+    textCache: new Map(), // Datei → { text, pages } (schon ausgelesen)
+    dirty: new Set(),     // Felder, die von Hand geändert wurden
+    aiToken: 0,   // z. B. Person oder „Steuer 2026“
     query: "",
     results: null,
     editing: null,
@@ -361,6 +365,78 @@
     if (previewBack) openSheet(previewBack); else closeSheets();
   });
 
+  // ---------- KI: Angaben aus dem Inhalt vorschlagen ----------
+  async function aiSuggest(text, fileName) {
+    const { data, error } = await sb.functions.invoke("assist", { body: {
+      action: "docmeta", text: text.slice(0, 20000), file_name: fileName,
+      categories: catList(), tags: ar.tags.map(t => t.name)
+    } });
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+      throw new Error(msg);
+    }
+    return { ...data, tag_ids: (data.tags || []).map(n => (ar.tags.find(t => t.name === n) || {}).id).filter(Boolean) };
+  }
+
+  function aiStatus(msg, kind = "") {
+    const el = $("#ar-ai-status");
+    el.hidden = !msg;
+    el.textContent = msg || "";
+    el.className = "ar-ai-status small" + (kind ? " " + kind : "");
+  }
+
+  // Vorschlag ins Formular – von Hand Geändertes bleibt (außer bei „überschreiben“)
+  function applySuggestion(s, overwrite) {
+    const f = $("#form-ar");
+    const set = (name, val) => { if (val && (overwrite || !ar.dirty.has(name))) f[name].value = val; };
+    set("title", s.title);
+    set("doc_date", s.doc_date);
+    set("category", s.category);
+    if (s.notes && (overwrite ? !f.notes.value.includes(s.notes) : !f.notes.value.trim())) {
+      f.notes.value = f.notes.value.trim() ? `${f.notes.value.trim()}\n${s.notes}` : s.notes;
+    }
+    for (const id of s.tag_ids || []) ar.draftTags.add(id);
+    renderCats();
+    renderTagPicker();
+  }
+
+  async function readPending(file) {
+    if (ar.textCache.has(file)) return ar.textCache.get(file);
+    let r = { text: "", pages: null };
+    if (/pdf/i.test(file.type) || /\.pdf$/i.test(file.name)) r = await pdfText(file, (i, total) => aiStatus(`📖 Text wird gelesen … ${i}/${total}`));
+    else if (/^text\//.test(file.type) && file.size < 2 * 1024 * 1024) r = { text: (await file.text()).slice(0, MAX_TEXT), pages: null };
+    ar.textCache.set(file, r);
+    return r;
+  }
+
+  // Beim Auswählen einer einzelnen PDF gleich lesen und Vorschlag holen
+  async function autoSuggest() {
+    if (!ar.ai || ar.editing || ar.pending.length !== 1) { aiStatus(""); return; }
+    const file = ar.pending[0];
+    if (!(/pdf/i.test(file.type) || /\.pdf$/i.test(file.name) || /^text\//.test(file.type))) { aiStatus(""); return; }
+    const token = ++ar.aiToken;
+    try {
+      const { text } = await readPending(file);
+      if (token !== ar.aiToken) return;
+      if (text.trim().length < 20) { aiStatus("Kein lesbarer Text (eingescannt?) – bitte die Angaben selbst eintragen.", "warn"); return; }
+      aiStatus("✨ KI liest das Dokument …");
+      const s = await aiSuggest(text, file.name);
+      if (token !== ar.aiToken) return;
+      applySuggestion(s, false);
+      aiStatus("✨ Vorschlag übernommen – bitte kurz prüfen.", "ok");
+    } catch (err) {
+      if (token === ar.aiToken) aiStatus(`KI-Vorschlag nicht möglich: ${err.message}`, "warn");
+    }
+  }
+
+  ["title", "doc_date", "category"].forEach(n => $("#form-ar")[n].addEventListener("input", () => ar.dirty.add(n)));
+  $("#ar-ai-toggle").addEventListener("change", e => {
+    ar.ai = e.target.checked;
+    storageSet("pp_ar_ai", ar.ai ? "1" : "0");
+    if (ar.ai) autoSuggest(); else { ar.aiToken++; aiStatus(""); }
+  });
+
   // ---------- Ablegen / Bearbeiten ----------
   function renderTagPicker() {
     $("#ar-edit-tags").innerHTML = ar.tags.length
@@ -386,7 +462,12 @@
     f.category.value = ar.filter || "";
     renderCats();
     if (!ar.folders.length) loadFolders().then(renderCats);
-    if (files.length === 1) f.title.value = files[0].name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    if (files.length === 1) f.title.value = splitName(files[0].name).title;
+    ar.dirty = new Set();
+    ar.textCache = new Map();
+    ar.aiToken++;
+    aiStatus("");
+    $("#ar-ai-toggle").checked = ar.ai;
     $("#ar-sheet-title").textContent = "Dokument ablegen";
     $("#ar-file-block").hidden = false;
     $("#ar-detail").hidden = true;
@@ -396,6 +477,7 @@
     renderPending();
     renderTagPicker();
     openSheet("sheet-archive");
+    autoSuggest();
   }
 
   function openDoc(id) {
@@ -419,6 +501,10 @@
     $("#ar-title-row").hidden = false;
     $("#ar-multi-hint").hidden = true;
     $("#ar-detail").hidden = false;
+    ar.dirty = new Set();
+    ar.aiToken++;
+    aiStatus("");
+    $("#btn-ar-ai").hidden = !d.has_text;
     $("#ar-detail-file").innerHTML = `${fileIcon(d.mime || "")} ${escapeHtml(d.file_name)} · ${sizeText(d.size)}${d.pages ? ` · ${d.pages} Seiten` : ""}` +
       (/pdf/.test(d.mime || "") ? (d.has_text ? " · durchsuchbar ✓" : " · kein Text (eingescannt)") : "");
     $("#btn-ar-save").textContent = "Speichern";
@@ -438,8 +524,9 @@
     else {
       ar.pending.push(...files);
       const f = $("#form-ar");
-      if (ar.pending.length === 1 && !f.title.value) f.title.value = files[0].name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+      if (ar.pending.length === 1 && !f.title.value) f.title.value = splitName(files[0].name).title;
       renderPending();
+      autoSuggest();
     }
   });
 
@@ -460,6 +547,19 @@
     } else if (b.dataset.arCat !== undefined) {
       $("#form-ar").category.value = b.dataset.arCat;
       renderCats();
+    } else if (b.id === "btn-ar-ai") {
+      const d = ar.editing;
+      b.disabled = true;
+      aiStatus("✨ KI liest das Dokument …");
+      try {
+        const { data: row, error } = await sb.from("archive_docs").select("text_content").eq("id", d.id).single();
+        if (error) throw error;
+        if (!row.text_content || row.text_content.trim().length < 20) throw new Error("Dieses Dokument hat keinen lesbaren Text (eingescannt oder Foto).");
+        applySuggestion(await aiSuggest(row.text_content, d.file_name), true);
+        aiStatus("✨ Vorschlag eingetragen – mit „Speichern“ übernehmen.", "ok");
+      } catch (err) {
+        aiStatus(`KI-Vorschlag nicht möglich: ${err.message}`, "warn");
+      } finally { b.disabled = false; }
     } else if (b.id === "btn-ar-preview") {
       const d = ar.editing;
       showPreview(d.title, () => downloadBlob(d), d.mime, "sheet-archive");
@@ -541,7 +641,9 @@
           const n = ar.pending.length > 1 ? ` (${done + 1}/${ar.pending.length})` : "";
           let text = "", pages = null;
           const isPdf = /pdf/i.test(file.type) || /\.pdf$/i.test(file.name);
-          if (isPdf) {
+          if (ar.textCache.has(file)) {
+            ({ text, pages } = ar.textCache.get(file));
+          } else if (isPdf) {
             try {
               const r = await pdfText(file, (i, total) => { btn.textContent = `Text wird gelesen${n} … ${i}/${total}`; });
               text = r.text; pages = r.pages;
@@ -734,7 +836,7 @@
     const f = e.target, btn = $("#btn-ar-imp");
     const chosen = [...imp.picked].sort((a, b) => a - b).map(i => imp.files[i]);
     imp.busy = true; btn.disabled = true;
-    let done = 0;
+    let done = 0, aiFail = "";
     const failed = [];
     try {
       for (const file of chosen) {
@@ -754,19 +856,29 @@
             }
           } catch (err) { console.warn("Text:", err); }
         }
-        btn.textContent = `Wird übernommen ${n} …`;
         const parts = splitName(file.name);
+        let sug = null;
+        if (f.ai.checked && text.trim().length >= 20) {
+          btn.textContent = `✨ KI liest ${n} …`;
+          try { sug = await aiSuggest(text, file.name); } catch (err) { console.warn("KI:", err); aiFail = err.message; }
+        }
+        btn.textContent = `Wird übernommen ${n} …`;
+        // Unterordner bleibt die Kategorie; nur Dateien direkt im Archiv-Ordner bekommen die KI-Kategorie
+        const category = (file.folder || (sug && sug.category) || "Sonstiges").slice(0, 60);
+        const tagIds = [...new Set([...imp.tags, ...((sug && sug.tag_ids) || [])])].filter(id => ar.tags.some(t => t.id === id));
         const { data: row, error } = await sb.from("archive_docs").insert({
-          household_id: hid(), title: parts.title.slice(0, 200), category: (file.folder || "Sonstiges").slice(0, 60),
-          doc_date: parts.date || (file.modified ? file.modified.slice(0, 10) : null), notes: "",
-          tag_ids: [...imp.tags].filter(id => ar.tags.some(t => t.id === id)), is_private: f.is_private.checked,
+          household_id: hid(), title: ((sug && sug.title) || parts.title).slice(0, 200), category,
+          doc_date: (sug && sug.doc_date) || parts.date || (file.modified ? file.modified.slice(0, 10) : null), notes: ((sug && sug.notes) || "").slice(0, 2000),
+          tag_ids: tagIds, is_private: f.is_private.checked,
           file_name: file.name.slice(0, 255), file_path: file.path, size: file.size || 0, mime, pages, text_content: text
         }).select("id, title, doc_date, file_name").single();
         if (error) { console.warn(error); failed.push(file.name); continue; }
         done++;
-        if (f.rename.checked && !sameName(row.file_name, fileNameFor(row.title, row.doc_date, row.file_name))) {
-          btn.textContent = `Wird umbenannt ${n} …`;
-          try { await call("place", { doc_id: row.id }); } catch (err) { console.warn("Umbenennen:", err); }
+        const wrongFolder = category !== (file.folder || "");
+        const wrongName = f.rename.checked && !sameName(row.file_name, fileNameFor(row.title, row.doc_date, row.file_name));
+        if (wrongFolder || wrongName) {
+          btn.textContent = `Wird einsortiert ${n} …`;
+          try { await call(f.rename.checked ? "place" : "move", { doc_id: row.id, category }); } catch (err) { console.warn("Einsortieren:", err); }
         }
       }
     } finally {
@@ -776,7 +888,7 @@
     closeSheets();
     toast(failed.length
       ? `${done} übernommen, ${failed.length} fehlgeschlagen: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " …" : ""}`
-      : `${done} Dokument${done === 1 ? "" : "e"} übernommen.`, !!failed.length);
+      : `${done} Dokument${done === 1 ? "" : "e"} übernommen.${aiFail ? ` KI-Vorschläge teilweise nicht möglich: ${aiFail}` : ""}`, !!failed.length || !!aiFail);
   });
 
   // ---------- Modul ----------

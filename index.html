@@ -952,6 +952,7 @@
         <span class="field-label">Tags für alle ausgewählten</span>
         <div class="chips" id="ar-imp-tags"></div>
         <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+        <label class="switch"><input type="checkbox" name="ai" checked><span>✨ Titel, Datum, Tags und Notiz per KI aus dem Inhalt (PDF)</span></label>
         <label class="switch"><input type="checkbox" name="rename" checked><span>Dateien in HiDrive umbenennen („JJJJ-MM-TT Titel“)</span></label>
         <p class="muted small">Kategorie = Unterordner in HiDrive, Titel = Dateiname, Datum = Datum vorne im Dateinamen, sonst Änderungsdatum. Alles lässt sich danach beim Dokument ändern. Bei PDFs wird der Text für die Suche gelesen.</p>
         <button type="submit" class="btn btn-primary btn-block" id="btn-ar-imp">Übernehmen</button>
@@ -1001,13 +1002,16 @@
       <button type="button" class="btn btn-secondary btn-block" id="btn-ar-pick">📎 Datei oder Foto auswählen</button>
       <input type="file" id="ar-file-input" multiple hidden>
       <p class="muted small">PDFs werden beim Ablegen durchsucht, damit die Suche auch den Inhalt findet. Bei eingescannten PDFs und Fotos geht das nicht.</p>
+      <label class="switch"><input type="checkbox" id="ar-ai-toggle"><span>✨ Angaben aus dem Inhalt vorschlagen (KI)</span></label>
     </div>
+    <p class="ar-ai-status small" id="ar-ai-status" hidden></p>
     <div id="ar-detail" hidden>
       <p class="muted small" id="ar-detail-file"></p>
       <div class="btn-row">
         <button type="button" class="btn btn-primary btn-small" id="btn-ar-preview">👁 Vorschau</button>
         <button type="button" class="btn btn-small" id="btn-ar-open">📄 Öffnen</button>
         <button type="button" class="btn btn-small" id="btn-ar-share">↗︎ Teilen / Sichern</button>
+        <button type="button" class="btn btn-small" id="btn-ar-ai">✨ Vorschlag aus Inhalt</button>
       </div>
     </div>
     <form id="form-ar" class="form" autocomplete="off">
