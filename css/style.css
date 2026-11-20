@@ -1556,3 +1556,7 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .rss-feed-title { font-weight: 600; overflow-wrap: anywhere; }
 .rss-suggest { margin: 8px 0 4px; }
 #form-rss-find input { min-width: 0; }
+
+/* Archiv: Tag-Filter (Person, Steuerjahr …) */
+.ar-tagchips { margin-top: 6px; }
+.ar-tagchips:empty { display: none; }

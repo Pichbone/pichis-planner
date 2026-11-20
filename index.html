@@ -405,6 +405,7 @@
         </button>
       </div>
       <div class="chips" id="ar-chips"></div>
+      <div class="chips ar-tagchips" id="ar-tagchips"></div>
       <div id="ar-items"></div>
       <div id="ar-footer"></div>
      </div>
@@ -938,6 +939,27 @@
   </div>
 
   <!-- Archiv: Dokument -->
+  <div id="sheet-hidrive" class="sheet" hidden role="dialog" aria-label="HiDrive verbinden">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>HiDrive verbinden</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-hidrive" class="form" autocomplete="off">
+      <label>HiDrive-Benutzername
+        <input type="text" name="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="100" required>
+      </label>
+      <label>Passwort
+        <input type="password" name="password" autocomplete="new-password" maxlength="300" required>
+      </label>
+      <label>Ordner in HiDrive
+        <input type="text" name="folder" maxlength="300" placeholder="Pichis Planner Archiv">
+      </label>
+      <p class="muted small">Die App verbindet sich über WebDAV mit <strong>webdav.hidrive.strato.com</strong>. Das Passwort wird verschlüsselt auf dem Server gespeichert und ist in der App nicht mehr sichtbar. Tipp: Ein eigener HiDrive-Benutzer nur für die App, mit Zugriff auf diesen Ordner, ist am sichersten.</p>
+      <button type="submit" class="btn btn-primary btn-block">Verbinden</button>
+    </form>
+  </div>
+
   <div id="sheet-archive" class="sheet sheet-tall" hidden role="dialog" aria-label="Dokument">
     <div class="sheet-handle"></div>
     <div class="panel-head">
@@ -1792,21 +1814,6 @@
   <!-- Meldungen -->
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-  <script>
-    // Rückkehr von der STRATO-HiDrive-Anmeldung: Code merken und Adresse aufräumen,
-    // bevor die Anmeldung der App die Adresse liest
-    (function () {
-      var u = new URL(location.href), code = u.searchParams.get("code"), st = u.searchParams.get("state"), err = u.searchParams.get("error");
-      if ((code && st) || err) {
-        try {
-          if (code && st) sessionStorage.setItem("pp_hidrive_cb", JSON.stringify({ code: code, state: st }));
-          if (err) sessionStorage.setItem("pp_hidrive_err", u.searchParams.get("error_description") || err);
-        } catch (e) {}
-        // zurück auf die Startadresse der App (die Rückleitung kommt über /api/hidrive/callback)
-        history.replaceState(null, "", "/#/archiv");
-      }
-    })();
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/config.js"></script>
   <script src="/js/app.js"></script>

@@ -23,6 +23,7 @@
     docs: [],
     tags: [],
     filter: storageGet("pp_ar_filter") || "",
+    tagFilter: storageGet("pp_ar_tag") || "",   // z. B. Person oder „Steuer 2026“
     query: "",
     results: null,
     editing: null,
@@ -79,40 +80,30 @@
     return new Blob([await res.arrayBuffer()], { type: doc.mime || res.headers.get("content-type") || "application/octet-stream" });
   }
 
-  // ---------- Rückkehr von der STRATO-Anmeldung ----------
-  // STRATO leitet mit ?code=…&state=… zurück auf die App. Wir merken uns das,
-  // räumen die Adresse auf und verbinden, sobald die Anmeldung bereit ist.
-  (() => {
-    const u = new URL(location.href);
-    const code = u.searchParams.get("code"), st = u.searchParams.get("state");
-    if (code && st) {
-      try { sessionStorage.setItem("pp_hidrive_cb", JSON.stringify({ code, state: st })); } catch { /* egal */ }
-      history.replaceState(null, "", "/#/archiv");
-    }
-    if (u.searchParams.get("error")) {
-      try { sessionStorage.setItem("pp_hidrive_err", u.searchParams.get("error_description") || u.searchParams.get("error")); } catch { /* egal */ }
-      history.replaceState(null, "", "/#/archiv");
-    }
-  })();
-
-  async function finishCallback() {
-    let cb = null, err = null;
-    try {
-      cb = JSON.parse(sessionStorage.getItem("pp_hidrive_cb") || "null");
-      err = sessionStorage.getItem("pp_hidrive_err");
-      sessionStorage.removeItem("pp_hidrive_cb");
-      sessionStorage.removeItem("pp_hidrive_err");
-    } catch { /* egal */ }
-    if (err) { toast("HiDrive-Anmeldung abgebrochen: " + err, true); return; }
-    if (!cb) return;
-    try {
-      const r = await call("callback", cb);
-      ar.status = { ...(ar.status || {}), connected: true, alias: r.alias, folder: r.folder, can_manage: true };
-      toast(`HiDrive verbunden – Ordner „${r.folder.split("/").pop()}“ ist angelegt.`);
-    } catch (e) {
-      toast(e.message, true);
-    }
+  // ---------- HiDrive verbinden (WebDAV, Benutzername + Passwort) ----------
+  function openConnect() {
+    const f = $("#form-hidrive");
+    f.reset();
+    f.username.value = (ar.status && ar.status.alias) || "";
+    const folder = ar.status && ar.status.folder;
+    f.folder.value = folder && ar.status.alias && folder.startsWith(`/users/${ar.status.alias}/`)
+      ? folder.slice(`/users/${ar.status.alias}/`.length) : (folder || "Pichis Planner Archiv");
+    openSheet("sheet-hidrive");
   }
+
+  $("#form-hidrive").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target;
+    PP.withBusy(f, async () => {
+      const r = await call("connect", { username: f.username.value.trim(), password: f.password.value, folder: f.folder.value.trim() });
+      f.password.value = "";
+      ar.status = { ...(ar.status || {}), error: null, connected: true, alias: r.alias, folder: r.folder, can_manage: true };
+      closeSheets();
+      render(); renderFooter();
+      toast(`HiDrive verbunden – Ordner „${r.folder.split("/").pop()}“ ist bereit.`);
+    });
+  });
+
 
   // ---------- Daten ----------
   const LIST_FIELDS = "id, title, category, doc_date, notes, tag_ids, file_name, size, mime, pages, has_text, is_private, created_by, created_at, updated_at";
@@ -184,7 +175,7 @@
       box.innerHTML = `<div class="banner banner-action">
         <div><strong>📂 Mit STRATO HiDrive verbinden</strong>
         <div class="small">${s.can_manage
-          ? "Die Dokumente werden in deinem HiDrive im Ordner „Pichis Planner Archiv“ abgelegt. Du meldest dich dazu einmal bei STRATO an."
+          ? "Die Dokumente werden in deinem HiDrive im Ordner „Pichis Planner Archiv“ abgelegt. Dazu einmal den HiDrive-Benutzernamen und das Passwort eingeben (WebDAV)."
           : "Das Archiv muss einmal von der Verwaltung des Haushalts mit HiDrive verbunden werden."}</div></div>
         ${s.can_manage ? `<button class="btn btn-primary btn-small" id="btn-ar-connect">Verbinden</button>` : ""}
       </div>`;
@@ -211,7 +202,14 @@
         : `<p class="muted cal-empty">Nichts gefunden.</p>`;
       return;
     }
-    const list = ar.filter ? ar.docs.filter(d => d.category === ar.filter) : ar.docs;
+    // Tags, die im Archiv vorkommen (für Person, Steuerjahr usw.)
+    const usedTags = ar.tags.filter(t => ar.docs.some(d => (d.tag_ids || []).includes(t.id)));
+    if (ar.tagFilter && !usedTags.some(t => t.id === ar.tagFilter)) ar.tagFilter = "";
+    const inCat = ar.filter ? ar.docs.filter(d => d.category === ar.filter) : ar.docs;
+    $("#ar-tagchips").innerHTML = usedTags.length
+      ? usedTags.map(t => `<button class="chip chip-tag${ar.tagFilter === t.id ? " active" : ""}" data-ar-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)} <span class="chip-count">${inCat.filter(d => (d.tag_ids || []).includes(t.id)).length}</span></button>`).join("")
+      : "";
+    const list = ar.tagFilter ? inCat.filter(d => (d.tag_ids || []).includes(ar.tagFilter)) : inCat;
     $("#ar-items").innerHTML = list.length
       ? `<ul class="ar-list">${list.map(d => row(d)).join("")}</ul>`
       : (ar.status && ar.status.connected ? `<div class="empty"><div class="empty-icon">🗄️</div>
@@ -231,6 +229,14 @@
       const { data, error } = await sb.rpc("archive_search", { p_household: hid(), p_query: ar.query.trim() });
       if (token !== ar.token) return;
       ar.results = (error || !data) ? ar.docs.filter(d => d.title.toLowerCase().includes(ar.query.toLowerCase())).map(d => ({ id: d.id, title: d.title, snippet: "" })) : data;
+      // Treffer über Tag-Namen ergänzen (z. B. „Tim“ oder „Steuer 2026“)
+      const q = ar.query.trim().toLowerCase();
+      const tagIds = ar.tags.filter(t => t.name.toLowerCase().includes(q)).map(t => t.id);
+      if (tagIds.length) {
+        const have = new Set(ar.results.map(r => r.id));
+        ar.results = ar.results.concat(ar.docs.filter(d => !have.has(d.id) && (d.tag_ids || []).some(id => tagIds.includes(id)))
+          .map(d => ({ id: d.id, title: d.title, snippet: "" })));
+      }
       render();
     }, 300);
   });
@@ -483,6 +489,7 @@
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.arFilter !== undefined) { ar.filter = b.dataset.arFilter; storageSet("pp_ar_filter", ar.filter); render(); return; }
+    if (b.dataset.arTag) { ar.tagFilter = ar.tagFilter === b.dataset.arTag ? "" : b.dataset.arTag; storageSet("pp_ar_tag", ar.tagFilter); render(); return; }
     if (b.dataset.arDoc) { openDoc(b.dataset.arDoc); return; }
     if (b.id === "btn-ar-add") { openAdd(); return; }
     if (b.id === "btn-ar-retry") {
@@ -491,12 +498,7 @@
       render(); renderFooter();
       return;
     }
-    if (b.id === "btn-ar-connect") {
-      b.disabled = true;
-      try { const { url } = await call("auth_url"); location.href = url; }
-      catch (err) { toast(err.message, true); b.disabled = false; }
-      return;
-    }
+    if (b.id === "btn-ar-connect" || b.id === "btn-ar-relogin") { openConnect(); return; }
     if (b.id === "btn-ar-disconnect") {
       if (!confirm("HiDrive-Verbindung trennen? Die Dateien bleiben in HiDrive, sind in der App aber erst nach dem erneuten Verbinden wieder abrufbar.")) return;
       try { await call("disconnect"); ar.status = { ...ar.status, connected: false }; render(); renderFooter(); toast("Verbindung getrennt."); }
@@ -507,7 +509,7 @@
   function renderFooter() {
     const s = ar.status;
     $("#ar-footer").innerHTML = s && s.connected
-      ? `<p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
+      ? `<p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
       : "";
   }
 
@@ -518,7 +520,6 @@
       $("#ar-search").value = ar.query;
       render();
       try {
-        await finishCallback();
         const [st] = await Promise.all([call("status").catch(err => ({ error: err.message || "Unbekannter Fehler" })), loadAll()]);
         if (st) ar.status = st;
         subscribe();
@@ -532,8 +533,6 @@
     leave() { ar.active = false; unsubscribe(); closeSheets(); },
     async resume() { if (ar.active) { try { await loadAll(); render(); } catch { /* egal */ } } },
     refreshTile() {
-      // nach der Rückkehr von STRATO direkt ins Archiv
-      try { if (sessionStorage.getItem("pp_hidrive_cb") && location.hash !== "#/archiv") location.hash = "#/archiv"; } catch { /* egal */ }
       sb.from("archive_docs").select("id", { count: "exact", head: true }).eq("household_id", hid())
         .then(({ count, error }) => { $("#tile-ar-status").textContent = error ? "Öffnen" : (count ? `${count} Dokument${count === 1 ? "" : "e"}` : "HiDrive"); });
     },
