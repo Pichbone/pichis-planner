@@ -56,11 +56,35 @@
     return { Authorization: `Bearer ${data.session.access_token}`, apikey: cfg.SUPABASE_KEY };
   }
 
-  async function uploadFile(file, folder) {
+  // Dateiname nach Schema „2026-10-02 Elektro Müller – Rechnung Bad.pdf“
+  // (gleiche Regeln wie in der Funktion „hidrive“ → fileNameFor)
+  function fileNameFor(title, date, oldName) {
+    const dot = oldName.lastIndexOf(".");
+    const ext = dot > 0 && oldName.length - dot <= 6 ? oldName.slice(dot).toLowerCase() : "";
+    const t = String(title || "").normalize("NFC").replace(/[\/\\:*?"<>|\u0000-\u001f]+/g, "-").replace(/\s+/g, " ").replace(/^[.\s]+/, "").trim().slice(0, 120).trim() || "Dokument";
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) ? `${date} ` : "";
+    return `${d}${t}${ext}`;
+  }
+  const sameName = (cur, want) => cur === want || cur.replace(/ \(\d+\)(\.[^.]*)?$/, "$1") === want;
+
+  // „2026-10-02 Rechnung.pdf“, „20261002_Rechnung.pdf“, „02.10.2026 Rechnung.pdf“ → Datum + Titel
+  function splitName(fileName) {
+    let base = fileName.replace(/\.[^.]+$/, "");
+    let date = null;
+    let m = base.match(/^(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})(?=[\s_\-–]|$)[\s_\-–]*/);
+    if (m) date = `${m[1]}-${m[2]}-${m[3]}`;
+    else if ((m = base.match(/^(\d{2})\.(\d{2})\.(\d{4})(?=[\s_\-–]|$)[\s_\-–]*/))) date = `${m[3]}-${m[2]}-${m[1]}`;
+    if (date && isNaN(new Date(date + "T12:00:00"))) date = null;
+    if (date) base = base.slice(m[0].length);
+    const title = base.replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+    return { date, title: title || fileName.replace(/\.[^.]+$/, "") };
+  }
+
+  async function uploadFile(file, folder, name = file.name) {
     const res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/hidrive`, {
       method: "POST",
       headers: { ...(await authHeaders()), "Content-Type": "application/octet-stream", "x-pp-action": "upload",
-        "x-pp-name": encodeURIComponent(file.name), "x-pp-folder": encodeURIComponent(folder) },
+        "x-pp-name": encodeURIComponent(name), "x-pp-folder": encodeURIComponent(folder) },
       body: file
     });
     const data = await res.json().catch(() => ({}));
@@ -492,9 +516,12 @@
       if (ar.editing) {
         const title = f.title.value.trim();
         if (!title) throw new Error("Bitte einen Titel eingeben.");
-        if (meta.category !== ar.editing.category && ar.status && ar.status.connected) {
-          // Datei in HiDrive in den Ordner der neuen Kategorie verschieben
-          const r = await call("move", { doc_id: ar.editing.id, category: meta.category });
+        const d0 = ar.editing;
+        const wantName = fileNameFor(title, meta.doc_date, d0.file_name);
+        if (ar.status && ar.status.connected &&
+            (meta.category !== d0.category || !sameName(d0.file_name, wantName))) {
+          // Datei in HiDrive in den Ordner der Kategorie verschieben und nach Datum + Titel benennen
+          const r = await call("place", { doc_id: d0.id, category: meta.category, title: title.slice(0, 200), doc_date: meta.doc_date });
           meta.category = r.category;
           if (r.moved && !ar.folders.includes(r.category)) ar.folders.push(r.category);
         }
@@ -523,10 +550,12 @@
             text = (await file.text()).slice(0, MAX_TEXT);
           }
           btn.textContent = `Wird in HiDrive abgelegt${n} …`;
-          const up = await uploadFile(file, meta.category);
-          const title = (ar.pending.length === 1 && f.title.value.trim()) || file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+          const parts = splitName(file.name);
+          const title = (ar.pending.length === 1 && f.title.value.trim()) || parts.title;
+          const date = meta.doc_date || parts.date;
+          const up = await uploadFile(file, meta.category, fileNameFor(title, date, file.name));
           const { error } = await sb.from("archive_docs").insert({
-            household_id: hid(), ...meta, is_private: !!meta.is_private,
+            household_id: hid(), ...meta, doc_date: date, is_private: !!meta.is_private,
             title: title.slice(0, 200), file_name: (up.name || file.name).slice(0, 255), file_path: up.path,
             size: file.size, mime: file.type || (isPdf ? "application/pdf" : ""), pages, text_content: text
           });
@@ -587,6 +616,7 @@
     }
     if (b.id === "btn-ar-connect" || b.id === "btn-ar-relogin") { openConnect(); return; }
     if (b.id === "btn-ar-import") { openImport(); return; }
+    if (b.id === "btn-ar-rename-all") { renameAll(b); return; }
     if (b.id === "btn-ar-disconnect") {
       if (!confirm("HiDrive-Verbindung trennen? Die Dateien bleiben in HiDrive, sind in der App aber erst nach dem erneuten Verbinden wieder abrufbar.")) return;
       try { await call("disconnect"); ar.status = { ...ar.status, connected: false }; render(); renderFooter(); toast("Verbindung getrennt."); }
@@ -597,8 +627,24 @@
   function renderFooter() {
     const s = ar.status;
     $("#ar-footer").innerHTML = s && s.connected
-      ? `<p class="ar-imp-cta"><button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button></p><p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
+      ? `<p class="ar-imp-cta"><button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button></p><p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-rename-all">Dateinamen angleichen</button> · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
       : "";
+  }
+
+  // ---------- Alle Dateinamen an Datum + Titel angleichen ----------
+  async function renameAll(btn) {
+    const todo = ar.docs.filter(d => !sameName(d.file_name, fileNameFor(d.title, d.doc_date, d.file_name)));
+    if (!todo.length) { toast("Alle Dateinamen passen schon zu Datum und Titel."); return; }
+    const ex = todo[0];
+    if (!confirm(`${todo.length} Datei${todo.length === 1 ? "" : "en"} in HiDrive umbenennen?\n\nBeispiel:\n${ex.file_name}\n→ ${fileNameFor(ex.title, ex.doc_date, ex.file_name)}`)) return;
+    btn.disabled = true;
+    let ok = 0, bad = 0;
+    for (const d of todo) {
+      btn.textContent = `Umbenennen … ${ok + bad + 1}/${todo.length}`;
+      try { await call("place", { doc_id: d.id }); ok++; } catch (err) { console.warn(d.file_name, err); bad++; }
+    }
+    await loadAll(); render(); renderFooter();
+    toast(bad ? `${ok} umbenannt, ${bad} nicht möglich (Datei fehlt in HiDrive?).` : `${ok} Datei${ok === 1 ? "" : "en"} umbenannt.`, !!bad);
   }
 
   // ---------- Aus HiDrive übernehmen ----------
@@ -610,7 +656,6 @@
     const ext = (f.name.split(".").pop() || "").toLowerCase();
     return MIME[ext] || (f.type && !/directory/i.test(f.type) ? f.type : "");
   };
-  const titleOf = name => name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim() || name;
 
   function renderImport() {
     const list = $("#ar-imp-list");
@@ -710,13 +755,19 @@
           } catch (err) { console.warn("Text:", err); }
         }
         btn.textContent = `Wird übernommen ${n} …`;
-        const { error } = await sb.from("archive_docs").insert({
-          household_id: hid(), title: titleOf(file.name).slice(0, 200), category: (file.folder || "Sonstiges").slice(0, 60),
-          doc_date: file.modified ? file.modified.slice(0, 10) : null, notes: "",
+        const parts = splitName(file.name);
+        const { data: row, error } = await sb.from("archive_docs").insert({
+          household_id: hid(), title: parts.title.slice(0, 200), category: (file.folder || "Sonstiges").slice(0, 60),
+          doc_date: parts.date || (file.modified ? file.modified.slice(0, 10) : null), notes: "",
           tag_ids: [...imp.tags].filter(id => ar.tags.some(t => t.id === id)), is_private: f.is_private.checked,
           file_name: file.name.slice(0, 255), file_path: file.path, size: file.size || 0, mime, pages, text_content: text
-        });
-        if (error) { console.warn(error); failed.push(file.name); } else done++;
+        }).select("id, title, doc_date, file_name").single();
+        if (error) { console.warn(error); failed.push(file.name); continue; }
+        done++;
+        if (f.rename.checked && !sameName(row.file_name, fileNameFor(row.title, row.doc_date, row.file_name))) {
+          btn.textContent = `Wird umbenannt ${n} …`;
+          try { await call("place", { doc_id: row.id }); } catch (err) { console.warn("Umbenennen:", err); }
+        }
       }
     } finally {
       imp.busy = false;
