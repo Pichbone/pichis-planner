@@ -170,6 +170,16 @@
     const s = ar.status;
     const box = $("#ar-status");
     if (!s) { box.innerHTML = ""; return; }
+    if (s.error) {
+      // Verbindung zu HiDrive konnte nicht geprüft werden – Grund dauerhaft anzeigen
+      box.innerHTML = `<div class="banner banner-action">
+        <div><strong>📂 HiDrive-Verbindung kann nicht geprüft werden</strong>
+        <div class="small">${escapeHtml(s.error)}</div></div>
+        <button class="btn btn-small" id="btn-ar-retry">Erneut</button>
+      </div>`;
+      $("#btn-ar-add").hidden = true;
+      return;
+    }
     if (!s.connected) {
       box.innerHTML = `<div class="banner banner-action">
         <div><strong>📂 Mit STRATO HiDrive verbinden</strong>
@@ -475,6 +485,12 @@
     if (b.dataset.arFilter !== undefined) { ar.filter = b.dataset.arFilter; storageSet("pp_ar_filter", ar.filter); render(); return; }
     if (b.dataset.arDoc) { openDoc(b.dataset.arDoc); return; }
     if (b.id === "btn-ar-add") { openAdd(); return; }
+    if (b.id === "btn-ar-retry") {
+      b.disabled = true;
+      ar.status = await call("status").catch(err => ({ error: err.message || "Unbekannter Fehler" }));
+      render(); renderFooter();
+      return;
+    }
     if (b.id === "btn-ar-connect") {
       b.disabled = true;
       try { const { url } = await call("auth_url"); location.href = url; }
@@ -503,7 +519,7 @@
       render();
       try {
         await finishCallback();
-        const [st] = await Promise.all([call("status").catch(err => { toast(err.message, true); return null; }), loadAll()]);
+        const [st] = await Promise.all([call("status").catch(err => ({ error: err.message || "Unbekannter Fehler" })), loadAll()]);
         if (st) ar.status = st;
         subscribe();
       } catch (err) {
