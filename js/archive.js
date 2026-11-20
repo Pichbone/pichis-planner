@@ -23,7 +23,8 @@
     docs: [],
     tags: [],
     filter: storageGet("pp_ar_filter") || "",
-    tagFilter: storageGet("pp_ar_tag") || "",   // z. B. Person oder „Steuer 2026“
+    tagFilter: storageGet("pp_ar_tag") || "",
+    folders: [],          // Unterordner in HiDrive = Kategorien   // z. B. Person oder „Steuer 2026“
     query: "",
     results: null,
     editing: null,
@@ -264,6 +265,78 @@
     return { text: text.replace(/\n{3,}/g, "\n\n").trim().slice(0, MAX_TEXT), pages: pdf.numPages };
   }
 
+  // ---------- Kategorien = Unterordner in HiDrive ----------
+  function catList() {
+    const used = ar.docs.map(d => d.category).filter(Boolean);
+    // Mit HiDrive-Ordnern: genau diese (plus schon benutzte), sonst die Vorschläge
+    return [...new Set(ar.folders.length ? [...ar.folders, ...used] : [...used, ...CATEGORIES])].sort((a, b) => a.localeCompare(b, "de"));
+  }
+  function renderCats() {
+    const cur = $("#form-ar").category.value.trim();
+    const list = catList();
+    $("#ar-cats").innerHTML = list.map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+    $("#ar-cat-chips").innerHTML = list.map(c =>
+      `<button type="button" class="chip${c === cur ? " active" : ""}" data-ar-cat="${escapeHtml(c)}">${ar.folders.includes(c) ? "📁 " : ""}${escapeHtml(c)}</button>`).join("");
+  }
+  async function loadFolders() {
+    if (!(ar.status && ar.status.connected)) return;
+    try { ar.folders = (await call("folders")).folders || []; } catch (err) { console.warn("Ordner:", err); }
+  }
+  $("#form-ar").category.addEventListener("input", renderCats);
+
+  // ---------- Vorschau ----------
+  let previewUrl = null, previewBack = null, previewToken = 0;
+  async function showPreview(title, getBlob, mime, back) {
+    const token = ++previewToken;
+    previewBack = back;
+    $("#arp-title").textContent = title;
+    $("#btn-arp-back").hidden = !back;
+    const body = $("#arp-body");
+    body.innerHTML = `<p class="muted cal-empty">Vorschau wird geladen …</p>`;
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    openSheet("sheet-ar-preview");
+    try {
+      const blob = await getBlob();
+      if (token !== previewToken) return;
+      const type = mime || blob.type || "";
+      if (/^image\//.test(type) && !/heic/i.test(type)) {
+        previewUrl = URL.createObjectURL(blob);
+        body.innerHTML = `<img class="arp-img" src="${previewUrl}" alt="">`;
+      } else if (/pdf/.test(type)) {
+        await loadScript(PDFJS);
+        const lib = window.pdfjsLib;
+        lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+        const pdf = await lib.getDocument({ data: await blob.arrayBuffer() }).promise;
+        const max = Math.min(pdf.numPages, 5);
+        body.innerHTML = "";
+        const width = Math.min(body.clientWidth || 360, 900);
+        for (let i = 1; i <= max; i++) {
+          if (token !== previewToken) return;
+          const page = await pdf.getPage(i);
+          const v1 = page.getViewport({ scale: 1 });
+          const scale = (width / v1.width) * Math.min(window.devicePixelRatio || 1, 2);
+          const vp = page.getViewport({ scale });
+          const c = document.createElement("canvas");
+          c.className = "arp-page";
+          c.width = vp.width; c.height = vp.height;
+          body.appendChild(c);
+          await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        }
+        if (pdf.numPages > max) body.insertAdjacentHTML("beforeend", `<p class="muted small">Vorschau zeigt die ersten ${max} von ${pdf.numPages} Seiten – „Öffnen“ zeigt alles.</p>`);
+      } else if (/^text\//.test(type) && blob.size < 1024 * 1024) {
+        body.innerHTML = `<pre class="arp-text">${escapeHtml(await blob.text())}</pre>`;
+      } else {
+        body.innerHTML = `<p class="muted cal-empty">Für diesen Dateityp gibt es keine Vorschau.${/heic/i.test(type) ? " (HEIC-Fotos kann der Browser nicht anzeigen.)" : ""}</p>`;
+      }
+    } catch (err) {
+      if (token === previewToken) body.innerHTML = `<p class="muted cal-empty">${escapeHtml(err.message || "Vorschau nicht möglich.")}</p>`;
+    }
+  }
+  $("#btn-arp-back").addEventListener("click", () => {
+    previewToken++;
+    if (previewBack) openSheet(previewBack); else closeSheets();
+  });
+
   // ---------- Ablegen / Bearbeiten ----------
   function renderTagPicker() {
     $("#ar-edit-tags").innerHTML = ar.tags.length
@@ -287,7 +360,8 @@
     const f = $("#form-ar");
     f.reset();
     f.category.value = ar.filter || "";
-    $("#ar-cats").innerHTML = [...new Set([...ar.docs.map(d => d.category).filter(Boolean), ...CATEGORIES])].map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+    renderCats();
+    if (!ar.folders.length) loadFolders().then(renderCats);
     if (files.length === 1) f.title.value = files[0].name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
     $("#ar-sheet-title").textContent = "Dokument ablegen";
     $("#ar-file-block").hidden = false;
@@ -314,7 +388,8 @@
     f.notes.value = d.notes || "";
     f.is_private.checked = d.is_private;
     f.is_private.disabled = d.created_by !== me();
-    $("#ar-cats").innerHTML = [...new Set([...ar.docs.map(x => x.category).filter(Boolean), ...CATEGORIES])].map(c => `<option value="${escapeHtml(c)}"></option>`).join("");
+    renderCats();
+    if (!ar.folders.length) loadFolders().then(renderCats);
     $("#ar-sheet-title").textContent = d.title;
     $("#ar-file-block").hidden = true;
     $("#ar-title-row").hidden = false;
@@ -358,6 +433,12 @@
       $("#ar-file-input").click();
     } else if (b.id === "btn-ar-tag-add") {
       addTag();
+    } else if (b.dataset.arCat !== undefined) {
+      $("#form-ar").category.value = b.dataset.arCat;
+      renderCats();
+    } else if (b.id === "btn-ar-preview") {
+      const d = ar.editing;
+      showPreview(d.title, () => downloadBlob(d), d.mime, "sheet-archive");
     } else if (b.id === "btn-ar-open") {
       openFile(ar.editing, false);
     } else if (b.id === "btn-ar-share") {
@@ -411,6 +492,12 @@
       if (ar.editing) {
         const title = f.title.value.trim();
         if (!title) throw new Error("Bitte einen Titel eingeben.");
+        if (meta.category !== ar.editing.category && ar.status && ar.status.connected) {
+          // Datei in HiDrive in den Ordner der neuen Kategorie verschieben
+          const r = await call("move", { doc_id: ar.editing.id, category: meta.category });
+          meta.category = r.category;
+          if (r.moved && !ar.folders.includes(r.category)) ar.folders.push(r.category);
+        }
         const { error } = await sb.from("archive_docs").update({ ...meta, title: title.slice(0, 200) }).eq("id", ar.editing.id);
         if (error) throw error;
         closeSheets();
@@ -451,7 +538,7 @@
         }
       } finally {
         btn.textContent = "Ablegen";
-        if (done) { await loadAll(); render(); }
+        if (done) { await loadAll(); render(); loadFolders(); }
       }
       closeSheets();
       toast(done === 1 ? "Dokument abgelegt." : `${done} Dokumente abgelegt.`);
@@ -532,7 +619,7 @@
       $("#ar-imp-opts").hidden = true;
       return;
     }
-    list.innerHTML = imp.files.map((f, i) => `<li><label class="ar-imp-row">
+    list.innerHTML = imp.files.map((f, i) => `<li class="ar-imp-li"><button type="button" class="icon-btn small ar-imp-eye" data-imp-preview="${i}" aria-label="Vorschau" title="Vorschau">👁</button><label class="ar-imp-row">
         <input type="checkbox" data-imp="${i}"${imp.picked.has(i) ? " checked" : ""}>
         <span class="file-icon">${fileIcon(mimeOf(f))}</span>
         <span class="ar-imp-text"><span class="ar-imp-name">${escapeHtml(f.name)}</span>
@@ -583,6 +670,12 @@
     renderImport();
   });
   $("#sheet-ar-import").addEventListener("click", e => {
+    const pv = e.target.closest("[data-imp-preview]");
+    if (pv) {
+      const file = imp.files[+pv.dataset.impPreview];
+      if (file) showPreview(file.name, () => fetchBlob(file.path), mimeOf(file), "sheet-ar-import");
+      return;
+    }
     const t = e.target.closest("[data-imp-tag]");
     if (!t) return;
     const id = t.dataset.impTag;
@@ -645,6 +738,7 @@
         const [st] = await Promise.all([call("status").catch(err => ({ error: err.message || "Unbekannter Fehler" })), loadAll()]);
         if (st) ar.status = st;
         subscribe();
+        loadFolders();
       } catch (err) {
         console.error(err);
         toast(/archive_docs|does not exist/i.test(err.message || "") ? "Bitte zuerst das SQL aus Schritt 30 in Supabase ausführen." : translateError(err), true);

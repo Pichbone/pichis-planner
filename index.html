@@ -958,6 +958,16 @@
     </form>
   </div>
 
+  <div id="sheet-ar-preview" class="sheet sheet-tall" hidden role="dialog" aria-label="Vorschau">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <button class="icon-btn" id="btn-arp-back" aria-label="Zurück">‹</button>
+      <h2 id="arp-title">Vorschau</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div class="arp-body" id="arp-body"></div>
+  </div>
+
   <div id="sheet-hidrive" class="sheet" hidden role="dialog" aria-label="HiDrive verbinden">
     <div class="sheet-handle"></div>
     <div class="panel-head">
@@ -994,7 +1004,8 @@
     <div id="ar-detail" hidden>
       <p class="muted small" id="ar-detail-file"></p>
       <div class="btn-row">
-        <button type="button" class="btn btn-primary btn-small" id="btn-ar-open">📄 Öffnen</button>
+        <button type="button" class="btn btn-primary btn-small" id="btn-ar-preview">👁 Vorschau</button>
+        <button type="button" class="btn btn-small" id="btn-ar-open">📄 Öffnen</button>
         <button type="button" class="btn btn-small" id="btn-ar-share">↗︎ Teilen / Sichern</button>
       </div>
     </div>
@@ -1012,6 +1023,7 @@
           <input type="date" name="doc_date">
         </label>
       </div>
+      <div class="chips ar-cat-chips" id="ar-cat-chips"></div>
       <label>Notiz <span class="hint">(optional)</span>
         <textarea name="notes" rows="2" maxlength="2000" placeholder="z. B. Vertragsnummer, Kündigungsfrist"></textarea>
       </label>

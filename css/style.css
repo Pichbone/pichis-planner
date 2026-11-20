@@ -1569,3 +1569,16 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .ar-imp-text { display: flex; flex-direction: column; min-width: 0; }
 .ar-imp-name { font-weight: 600; overflow-wrap: anywhere; }
 #ar-imp-tags { margin: 6px 0 4px; }
+
+/* Archiv: Kategorie-Chips, Vorschau */
+.ar-cat-chips { margin: -4px 0 4px; flex-wrap: wrap; overflow: visible; }
+.ar-cat-chips:empty { display: none; }
+.ar-imp-li { position: relative; }
+.ar-imp-li .ar-imp-row { padding-right: 52px; }
+.ar-imp-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); z-index: 1; }
+#sheet-ar-preview .panel-head { gap: 8px; }
+#arp-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.05rem; }
+.arp-body { display: grid; gap: 10px; padding-bottom: 12px; }
+.arp-img { width: 100%; height: auto; border-radius: 10px; background: var(--surface-2); }
+.arp-page { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.15); background: #fff; }
+.arp-text { white-space: pre-wrap; font-size: .85rem; background: var(--surface-2); padding: 12px; border-radius: 10px; max-height: 60vh; overflow: auto; }
