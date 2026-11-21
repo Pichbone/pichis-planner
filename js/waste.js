@@ -32,7 +32,15 @@
   const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const today = () => isoOf(new Date());
   const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoOf(d); };
-  const kindOf = summary => ORDER.find(k => KINDS[k].re.test(summary)) || "sonstig";
+  // Eigene Zuordnungen („Abfuhr 2“ → Biotonne) merken
+  const MAP_KEY = "pp_ws_map";
+  const loadMap = () => { try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}"); } catch { return {}; } };
+  const saveMap = m => { try { localStorage.setItem(MAP_KEY, JSON.stringify(m)); } catch { /* egal */ } };
+  const kindOf = (text, title) => {
+    const m = loadMap();
+    if (title && m[title.toLowerCase()]) return m[title.toLowerCase()];
+    return ORDER.find(k => KINDS[k].re.test(text)) || "sonstig";
+  };
   const label = r => (r.kind === "sonstig" && r.title) ? r.title : KINDS[r.kind].label;
 
   function sqlHint(err) {
@@ -74,14 +82,19 @@
             ev.date = isoOf(new Date(d.toLocaleString("en-US", { timeZone: "Europe/Berlin" })));
           } else ev.date = `${m[1]}-${m[2]}-${m[3]}`;
         }
-      } else if (key === "SUMMARY") ev.summary = val.replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\n/gi, " ").trim();
+      } else if (["SUMMARY", "DESCRIPTION", "CATEGORIES", "LOCATION"].includes(key)) {
+        ev[key.toLowerCase()] = val.replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\n/gi, " ").trim();
+      }
       else if (key === "RRULE") ev.rrule = val;
     }
     // Wiederholungen (selten bei Abfallkalendern) für bis zu 1 Jahr ausrollen
     const out = [];
     const limit = addDays(today(), 400);
     for (const e of events) {
-      out.push({ day: e.date, summary: e.summary || "" });
+      // Die Abfallart steht je nach Kalender im Titel, in der Beschreibung oder in der Kategorie
+      e.text = [e.summary, e.categories, e.description, e.location].filter(Boolean).join(" · ");
+      e.title = (ORDER.some(k => KINDS[k].re.test(e.summary || "")) ? e.summary : [e.summary, e.categories, e.description].filter(Boolean).join(" – ")) || "";
+      out.push({ day: e.date, text: e.text, title: e.title });
       if (!e.rrule) continue;
       const p = Object.fromEntries(e.rrule.split(";").map(x => x.split("=")));
       const step = p.FREQ === "WEEKLY" ? 7 * (+p.INTERVAL || 1) : p.FREQ === "DAILY" ? (+p.INTERVAL || 1) : 0;
@@ -91,12 +104,12 @@
       while (n < (+p.COUNT || 500)) {
         d = addDays(d, step);
         if (d > until || d > limit) break;
-        out.push({ day: d, summary: e.summary || "" });
+        out.push({ day: d, text: e.text, title: e.title });
         n++;
       }
     }
     const seen = new Set();
-    return out.map(e => ({ day: e.day, kind: kindOf(e.summary), title: e.summary.slice(0, 120) }))
+    return out.map(e => ({ day: e.day, kind: kindOf(e.text || "", e.title || ""), title: (e.title || "").slice(0, 120) }))
       .filter(e => { const k = e.day + e.kind; if (seen.has(k)) return false; seen.add(k); return true; })
       .sort((a, b) => a.day.localeCompare(b.day));
   }
@@ -126,8 +139,41 @@
           <span class="ws-chips">${on(up, d).map(chip).join("")}</span></li>`).join("")}</ul>
         <p class="muted small">${up.length} Termine bis ${new Date(up[up.length - 1].day + "T12:00:00").toLocaleDateString("de-DE")}. Für das nächste Jahr einfach die neue ICS-Datei laden.</p>`;
     }
+    renderUnknown();
     renderPush();
   }
+
+  // Unbekannte Abfallarten von Hand zuordnen
+  function renderUnknown() {
+    const box = $("#ws-unknown");
+    const titles = [...new Set(ws.rows.filter(r => r.kind === "sonstig").map(r => r.title || ""))];
+    if (!titles.length) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = `<p><strong>Welche Tonne ist das?</strong></p>
+      <p class="muted small">Diese Termine konnte die App keiner Abfallart zuordnen. Einmal auswählen – gilt für alle Termine mit diesem Namen, auch beim nächsten Laden der Datei.</p>
+      ${titles.map(t => `<label class="ws-map">${escapeHtml(t || "(ohne Namen)")}
+        <select data-ws-map="${escapeHtml(t)}"><option value="">– wählen –</option>${ORDER.map(k => `<option value="${k}">${KINDS[k].icon} ${KINDS[k].label}</option>`).join("")}</select>
+      </label>`).join("")}`;
+  }
+
+  $("#ws-unknown").addEventListener("change", async e => {
+    const sel = e.target.closest("[data-ws-map]");
+    if (!sel || !sel.value) return;
+    const title = sel.dataset.wsMap, kind = sel.value;
+    const m = loadMap(); m[title.toLowerCase()] = kind; saveMap(m);
+    // vorhandene Termine umstellen (gleicher Tag + Art schon da → doppelten Eintrag entfernen)
+    const rows = ws.rows.filter(r => r.kind === "sonstig" && (r.title || "") === title);
+    for (const r of rows) {
+      if (ws.rows.some(x => x.day === r.day && x.kind === kind)) {
+        await sb.from("waste_dates").delete().eq("id", r.id);
+      } else {
+        const { error } = await sb.from("waste_dates").update({ kind }).eq("id", r.id);
+        if (error) { toast(sqlHint(error), true); return; }
+      }
+    }
+    toast(`„${title}“ ist jetzt ${KINDS[kind].label}.`);
+    await refresh();
+  });
 
   function renderPush() {
     const f = $("#form-ws-push");
