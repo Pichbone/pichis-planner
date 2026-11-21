@@ -1728,3 +1728,5 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .ws-unknown { margin-bottom: 12px; border-color: var(--orange, #E0703F); }
 .ws-map { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-weight: 600; }
 .ws-map select { max-width: 55%; }
+
+.ws-fixkind { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 4px; font-weight: 600; }

@@ -34,6 +34,8 @@
   const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoOf(d); };
   // Eigene Zuordnungen („Abfuhr 2“ → Biotonne) merken
   const MAP_KEY = "pp_ws_map";
+  // Version 0.45.1 hat bei gleichlautenden Terminen falsch zugeordnet – einmalig vergessen
+  try { if (localStorage.getItem("pp_ws_map_v") !== "2") { localStorage.removeItem("pp_ws_map"); localStorage.setItem("pp_ws_map_v", "2"); } } catch { /* egal */ }
   const loadMap = () => { try { return JSON.parse(localStorage.getItem(MAP_KEY) || "{}"); } catch { return {}; } };
   const saveMap = m => { try { localStorage.setItem(MAP_KEY, JSON.stringify(m)); } catch { /* egal */ } };
   const kindOf = (text, title) => {
@@ -86,13 +88,17 @@
         ev[key.toLowerCase()] = val.replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\n/gi, " ").trim();
       }
       else if (key === "RRULE") ev.rrule = val;
+      // Sonstige Angaben (z. B. UID „rest-…“, X-Felder, Farbe) – manche Kalender verstecken die Abfallart dort
+      if (!["DTSTART", "DTEND", "DTSTAMP", "CREATED", "LAST-MODIFIED", "SEQUENCE", "TRANSP", "STATUS", "RRULE", "SUMMARY", "DESCRIPTION", "CATEGORIES", "LOCATION", "BEGIN", "END"].includes(key)) {
+        ev.extra = ((ev.extra || "") + " " + val).slice(0, 500);
+      }
     }
     // Wiederholungen (selten bei Abfallkalendern) für bis zu 1 Jahr ausrollen
     const out = [];
     const limit = addDays(today(), 400);
     for (const e of events) {
       // Die Abfallart steht je nach Kalender im Titel, in der Beschreibung oder in der Kategorie
-      e.text = [e.summary, e.categories, e.description, e.location].filter(Boolean).join(" · ");
+      e.text = [e.summary, e.categories, e.description, e.location, e.extra].filter(Boolean).join(" · ");
       e.title = (ORDER.some(k => KINDS[k].re.test(e.summary || "")) ? e.summary : [e.summary, e.categories, e.description].filter(Boolean).join(" – ")) || "";
       out.push({ day: e.date, text: e.text, title: e.title });
       if (!e.rrule) continue;
@@ -128,7 +134,7 @@
     const box = $("#ws-items");
     if (!ws.loaded) { box.innerHTML = `<p class="muted cal-empty">Wird geladen …</p>`; return; }
     const t = today();
-    const up = ws.rows.filter(r => r.day >= t);
+    const up = ws.rows.filter(r => r.day >= t).sort((a, b) => a.day.localeCompare(b.day));
     if (!up.length) {
       box.innerHTML = `<div class="empty"><div class="empty-icon">🗑️</div><p><strong>Noch keine Abholtermine.</strong></p>
         <p class="muted small">Lade beim Abfallkalender der KAW Mainz-Bingen für deine Straße die <b>ICS-Datei</b> herunter und tippe oben auf „📥 ICS-Datei laden“.</p></div>`;
@@ -137,7 +143,7 @@
       box.innerHTML = `<ul class="ws-list">${days.map(d => `<li class="${d === t ? "is-today" : ""}${d === addDays(t, 1) ? " is-tomorrow" : ""}">
           <span class="ws-date">${escapeHtml(dayLabel(d))}</span>
           <span class="ws-chips">${on(up, d).map(chip).join("")}</span></li>`).join("")}</ul>
-        <p class="muted small">${up.length} Termine bis ${new Date(up[up.length - 1].day + "T12:00:00").toLocaleDateString("de-DE")}. Für das nächste Jahr einfach die neue ICS-Datei laden.</p>`;
+        <p class="muted small">${up.length} Termine bis ${new Date(up[up.length - 1].day + "T12:00:00").toLocaleDateString("de-DE")}. Für das nächste Jahr einfach die neue ICS-Datei laden. · <button type="button" class="link danger-link" id="btn-ws-clear">Alle Termine löschen</button></p>`;
     }
     renderUnknown();
     renderPush();
@@ -147,6 +153,14 @@
   function renderUnknown() {
     const box = $("#ws-unknown");
     const titles = [...new Set(ws.rows.filter(r => r.kind === "sonstig").map(r => r.title || ""))];
+    const all = ws.rows.filter(r => r.day >= today());
+    // Alle Termine heißen gleich und nichts verrät die Tonne → Zuordnen ergibt keinen Sinn
+    if (titles.length === 1 && all.length > 3 && all.every(r => r.kind === "sonstig")) {
+      box.hidden = false;
+      box.innerHTML = `<p><strong>In der Datei steht nicht, welche Tonne abgeholt wird.</strong></p>
+        <p class="muted small">Alle Termine heißen „${escapeHtml(titles[0] || "–")}“. Bitte schau, ob es beim Abfallkalender eine Datei <b>je Abfallart</b> gibt (z. B. nur Restmüll, nur Bio …) – die kannst du nacheinander laden und dabei die Tonne wählen.</p>`;
+      return;
+    }
     if (!titles.length) { box.hidden = true; box.innerHTML = ""; return; }
     box.hidden = false;
     box.innerHTML = `<p><strong>Welche Tonne ist das?</strong></p>
@@ -203,17 +217,27 @@
     $("#ws-preview").innerHTML = `<p><b>${future.length} Termine</b> vom ${new Date(future[0].day + "T12:00:00").toLocaleDateString("de-DE")} bis ${new Date(future[future.length - 1].day + "T12:00:00").toLocaleDateString("de-DE")}:</p>
       <p class="ws-chips">${Object.entries(counts).sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0])).map(([k, n]) =>
         `<span class="ws-chip" style="--ws:${KINDS[k].color}">${KINDS[k].icon} ${KINDS[k].label} · ${n}×</span>`).join("")}</p>
-      <p class="muted small">Vorhandene Termine ab ${new Date(future[0].day + "T12:00:00").toLocaleDateString("de-DE")} werden dabei ersetzt.</p>`;
+      <p class="muted small">Vorhandene Termine ab ${new Date(future[0].day + "T12:00:00").toLocaleDateString("de-DE")} derselben Tonne(n) werden dabei ersetzt.</p>`;
+    $("#ws-fixkind").innerHTML = `<option value="">Automatisch erkennen</option>` + ORDER.map(k => `<option value="${k}">${KINDS[k].icon} nur ${KINDS[k].label}</option>`).join("");
+    // Datei ohne erkennbare Abfallart → gleich zur Auswahl auffordern
+    $("#ws-fixkind").value = "";
     openSheet("sheet-ws-import");
   });
 
   $("#btn-ws-import").addEventListener("click", async () => {
-    const rows = ws.preview;
+    const fixed = $("#ws-fixkind").value;
+    let rows = ws.preview;
     if (!rows || !rows.length) return;
+    if (fixed) {
+      const seen = new Set();
+      rows = rows.map(r => ({ ...r, kind: fixed })).filter(r => !seen.has(r.day) && seen.add(r.day));
+    }
     const btn = $("#btn-ws-import");
     btn.disabled = true;
     try {
-      const del = await sb.from("waste_dates").delete().eq("household_id", hid()).gte("day", rows[0].day);
+      // nur die Abfallarten aus dieser Datei ersetzen – so lassen sich mehrere Dateien (je Tonne) nacheinander laden
+      const kinds = [...new Set(rows.map(r => r.kind))];
+      const del = await sb.from("waste_dates").delete().eq("household_id", hid()).gte("day", rows[0].day).in("kind", kinds);
       if (del.error) throw del.error;
       for (let i = 0; i < rows.length; i += 300) {
         const { error } = await sb.from("waste_dates").insert(rows.slice(i, i + 300).map(r => ({ household_id: hid(), ...r })));
@@ -271,6 +295,15 @@
   $("#view-waste").addEventListener("click", e => {
     if (e.target.closest("#btn-ws-file")) $("#ws-file").click();
     if (e.target.closest("#btn-ws-old")) findOldTodos(false);
+    if (e.target.closest("#btn-ws-clear")) {
+      if (!confirm("Alle Abholtermine löschen? Danach die ICS-Datei(en) neu laden.")) return;
+      sb.from("waste_dates").delete().eq("household_id", hid()).then(({ error }) => {
+        if (error) { toast(sqlHint(error), true); return; }
+        try { localStorage.removeItem(MAP_KEY); } catch { /* egal */ }
+        toast("Alle Abholtermine gelöscht.");
+        refresh();
+      });
+    }
   });
 
   // ---------- Startseite ----------
