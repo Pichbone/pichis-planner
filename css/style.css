@@ -1599,3 +1599,11 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .ar-year .ar-list { margin-bottom: 8px; }
 .ar-more { margin: 8px 0 4px; }
 .ar-recipe-hint { margin: 10px 2px; }
+
+/* Datum und Uhrzeit oben im Kopf (statt des Familiennamens) */
+.eyebrow { display: flex; align-items: center; flex-wrap: nowrap; min-width: 0; }
+.eyebrow .weather-chip { flex-shrink: 0; }
+.topbar-title { min-width: 0; } .topbar-title > div { min-width: 0; }
+.topbar-clock { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.clock-time { font-variant-numeric: tabular-nums; }
+.clock-time::before { content: " · "; }

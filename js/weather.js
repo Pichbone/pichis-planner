@@ -131,4 +131,20 @@
     refreshTile: () => refresh(),   // läuft beim Öffnen der Startseite
     reset() {}
   };
+
+  // ---------- Datum und Uhrzeit oben im Kopf ----------
+  const fmtDate = new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "numeric", month: "short" });
+  const fmtTime = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+  let clockTimer = null;
+  function paintClock() {
+    const el = $("#clock-chip");
+    if (!el) return;
+    const now = new Date();
+    el.innerHTML = `<span class="clock-date">${fmtDate.format(now).replace(".,", ",")}</span><span class="clock-time">${fmtTime.format(now)}</span>`;
+    el.title = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    clearTimeout(clockTimer);
+    clockTimer = setTimeout(paintClock, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50);   // zur vollen Minute
+  }
+  paintClock();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) paintClock(); });
 })();
