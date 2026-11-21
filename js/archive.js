@@ -839,6 +839,18 @@
     }
     if (b.id === "btn-ar-connect" || b.id === "btn-ar-relogin") { openConnect(); return; }
     if (b.id === "btn-ar-import") { openImport(); return; }
+    if (b.id === "btn-ar-sync") {
+      b.disabled = true; b.textContent = "🔄 Wird abgeglichen …";
+      try {
+        const r = await call("scan");
+        if (r.fixed) { await loadAll(); render(); }
+        toast([r.fixed ? `${r.fixed} Eintr${r.fixed === 1 ? "ag" : "äge"} an HiDrive angepasst` : "Alles passt zu HiDrive",
+          r.files && r.files.length ? `${r.files.length} neue Datei${r.files.length === 1 ? "" : "en"} zum Übernehmen` : "",
+          r.missing ? `${r.missing} Datei${r.missing === 1 ? "" : "en"} in HiDrive nicht gefunden` : ""].filter(Boolean).join(" · ") + ".", !!r.missing);
+      } catch (err) { toast(err.message, true); }
+      finally { renderFooter(); }
+      return;
+    }
     if (b.id === "btn-ar-recipes-all") { recipesAll(b); return; }
     if (b.id === "btn-ar-rename-all") { renameAll(b); return; }
     if (b.id === "btn-ar-disconnect") {
@@ -851,7 +863,7 @@
   function renderFooter() {
     const s = ar.status;
     $("#ar-footer").innerHTML = s && s.connected
-      ? `<p class="ar-imp-cta"><button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button></p><p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-rename-all">Dateinamen angleichen</button> · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
+      ? `<p class="ar-imp-cta"><button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button> <button class="btn btn-small" id="btn-ar-sync">🔄 Mit HiDrive abgleichen</button></p><p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-rename-all">Dateinamen angleichen</button> · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
       : "";
   }
 
@@ -1016,11 +1028,13 @@
     openSheet("sheet-ar-import");
     try {
       const r = await call("scan");
+      if (r.fixed) { await loadAll(); render(); }
       imp.files = r.files || [];
       imp.picked = new Set(imp.files.map((_, i) => i));
       $("#ar-imp-info").textContent = imp.files.length
         ? `${imp.files.length} neue Datei${imp.files.length === 1 ? "" : "en"} im Ordner „${(r.root || "").split("/").pop()}“ gefunden.`
         : `Keine neuen Dateien – alles im Ordner „${(r.root || "").split("/").pop()}“ ist schon im Archiv.`;
+      if (r.fixed) $("#ar-imp-info").textContent += ` ${r.fixed} vorhandene Eintr${r.fixed === 1 ? "ag" : "äge"} an HiDrive angepasst (Ordner/Name).`;
     } catch (err) {
       $("#ar-imp-info").textContent = err.message;
     }
