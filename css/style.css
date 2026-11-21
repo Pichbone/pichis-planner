@@ -1590,3 +1590,12 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 
 /* Archiv: Rezepte → Essensplan */
 .ar-recipe-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; background: var(--surface-2); font-size: .9rem; }
+
+/* Archiv: nach Jahren gruppiert */
+.ar-year { margin-bottom: 6px; }
+.ar-year-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 4px 8px; border: 0; background: none; font: inherit; font-weight: 700; color: var(--text, inherit); cursor: pointer; text-align: left; }
+.ar-year-arrow { width: 14px; color: var(--muted); }
+.ar-year-name { font-size: 1rem; }
+.ar-year .ar-list { margin-bottom: 8px; }
+.ar-more { margin: 8px 0 4px; }
+.ar-recipe-hint { margin: 10px 2px; }

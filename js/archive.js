@@ -25,6 +25,8 @@
     filter: storageGet("pp_ar_filter") || "",
     tagFilter: storageGet("pp_ar_tag") || "",
     recipeLinks: new Map(),   // Archiv-Dokument → Rezept im Essensplan
+    limit: 50,                // „Alle“: so viele Dokumente zeigen, dann „Weitere anzeigen“
+    years: new Map(),         // Jahr → auf-/zugeklappt (von Hand)
     folders: [],          // Unterordner in HiDrive = Kategorien
     ai: storageGet("pp_ar_ai") !== "0",   // KI-Vorschläge beim Ablegen
     textCache: new Map(), // Datei → { text, pages } (schon ausgelesen)
@@ -241,18 +243,60 @@
     // Tags, die im Archiv vorkommen (für Person, Steuerjahr usw.)
     const usedTags = ar.tags.filter(t => ar.docs.some(d => (d.tag_ids || []).includes(t.id)));
     if (ar.tagFilter && !usedTags.some(t => t.id === ar.tagFilter)) ar.tagFilter = "";
-    const inCat = ar.filter ? ar.docs.filter(d => d.category === ar.filter) : ar.docs;
+    // „Alle“ ohne Rezepte – die gibt es über ihren eigenen Chip
+    const recipeCount = ar.filter ? 0 : ar.docs.filter(d => isRecipeCat(d.category)).length;
+    const inCat = ar.filter ? ar.docs.filter(d => d.category === ar.filter) : ar.docs.filter(d => !isRecipeCat(d.category));
     $("#ar-tagchips").innerHTML = usedTags.length
       ? usedTags.map(t => `<button class="chip chip-tag${ar.tagFilter === t.id ? " active" : ""}" data-ar-tag="${t.id}" style="--tag:${escapeHtml(t.color)}"><span class="dot"></span>${escapeHtml(t.name)} <span class="chip-count">${inCat.filter(d => (d.tag_ids || []).includes(t.id)).length}</span></button>`).join("")
       : "";
     const list = ar.tagFilter ? inCat.filter(d => (d.tag_ids || []).includes(ar.tagFilter)) : inCat;
     const openRecipes = isRecipeCat(ar.filter) ? list.filter(d => !ar.recipeLinks.has(d.id)).length : 0;
+    const recipeHint = recipeCount
+      ? `<p class="muted small ar-recipe-hint">🍽️ ${recipeCount} Rezept${recipeCount === 1 ? "" : "e"} findest du unter ${[...new Set(ar.docs.filter(d => isRecipeCat(d.category)).map(d => `„${escapeHtml(d.category)}“`))].join(", ")}.</p>` : "";
     $("#ar-items").innerHTML = list.length
       ? (openRecipes ? `<div class="ar-recipe-bar"><span>🍽️ ${openRecipes} Rezept${openRecipes === 1 ? "" : "e"} noch nicht im Essensplan</span><button class="btn btn-small" id="btn-ar-recipes-all">Alle übernehmen</button></div>` : "") +
-        `<ul class="ar-list">${list.map(d => row(d)).join("")}</ul>`
-      : (ar.status && ar.status.connected ? `<div class="empty"><div class="empty-icon">🗄️</div>
+        (isRecipeCat(ar.filter) ? recipeList(list) : yearList(list)) + recipeHint
+      : recipeHint || (ar.status && ar.status.connected ? `<div class="empty"><div class="empty-icon">🗄️</div>
           <p><strong>Noch keine Dokumente.</strong></p>
           <p class="muted small">Mit dem orangen + Verträge, Rechnungen oder Bescheide ablegen. Der Text in PDFs wird automatisch durchsuchbar.</p></div>` : "");
+  }
+
+  // Rezepte: alphabetisch, ohne Jahre
+  function recipeList(list) {
+    return `<ul class="ar-list">${[...list].sort((a, b) => a.title.localeCompare(b.title, "de", { numeric: true })).map(d => row(d)).join("")}</ul>`;
+  }
+
+  // Nach Jahren gruppiert, ältere Jahre zugeklappt; in „Alle“ nur die neuesten ar.limit
+  function yearList(list) {
+    const groups = new Map();
+    for (const d of list) {
+      const y = d.doc_date ? d.doc_date.slice(0, 4) : "";
+      if (!groups.has(y)) groups.set(y, []);
+      groups.get(y).push(d);
+    }
+    const years = [...groups.keys()].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : b.localeCompare(a)));
+    const autoOpen = new Set(years.filter(y => y).slice(0, 2));   // die zwei neuesten Jahre
+    const limited = !ar.filter && !ar.tagFilter;
+    let left = limited ? ar.limit : Infinity, hidden = 0;
+    const html = years.map(y => {
+      const docs = groups.get(y);
+      const open = ar.years.has(y) ? ar.years.get(y) : (autoOpen.has(y) || years.length === 1 || (y === "" && years.length <= 2));
+      let items = "";
+      if (open) {
+        // von Hand aufgeklappte Jahre ganz zeigen, sonst bis zur Grenze
+        const manual = ar.years.get(y) === true;
+        const show = manual ? docs : docs.slice(0, Math.max(0, left));
+        if (!manual) { left -= show.length; hidden += docs.length - show.length; }
+        items = show.length ? `<ul class="ar-list">${show.map(d => row(d)).join("")}</ul>` : "";
+      }
+      return `<section class="ar-year">
+        <button type="button" class="ar-year-head" data-ar-year="${y}" aria-expanded="${open}">
+          <span class="ar-year-arrow">${open ? "▾" : "▸"}</span>
+          <span class="ar-year-name">${y || "Ohne Datum"}</span>
+          <span class="chip-count">${docs.length}</span>
+        </button>${items}</section>`;
+    }).join("");
+    return html + (hidden ? `<button type="button" class="btn btn-secondary btn-block ar-more" id="btn-ar-more">Weitere anzeigen (${hidden})</button>` : "");
   }
 
   let searchTimer = null;
@@ -776,7 +820,14 @@
   $("#view-archive").addEventListener("click", async e => {
     const b = e.target.closest("button");
     if (!b) return;
-    if (b.dataset.arFilter !== undefined) { ar.filter = b.dataset.arFilter; storageSet("pp_ar_filter", ar.filter); render(); return; }
+    if (b.dataset.arFilter !== undefined) { ar.filter = b.dataset.arFilter; ar.limit = 50; storageSet("pp_ar_filter", ar.filter); render(); return; }
+    if (b.dataset.arYear !== undefined) {
+      const y = b.dataset.arYear;
+      ar.years.set(y, b.getAttribute("aria-expanded") !== "true");
+      render();
+      return;
+    }
+    if (b.id === "btn-ar-more") { ar.limit += 50; render(); return; }
     if (b.dataset.arTag) { ar.tagFilter = ar.tagFilter === b.dataset.arTag ? "" : b.dataset.arTag; storageSet("pp_ar_tag", ar.tagFilter); render(); return; }
     if (b.dataset.arDoc) { openDoc(b.dataset.arDoc); return; }
     if (b.id === "btn-ar-add") { openAdd(); return; }
