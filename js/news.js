@@ -17,6 +17,7 @@
     ["international", "🇬🇧 International"]
   ];
   const STAR = "star";
+  const ALL = "all";   // Nachrichten aller Rubriken + eigene Feeds auf einer Seite
   const SUGGEST = [
     ["heise.de", "heise"], ["golem.de", "Golem"], ["kicker.de", "kicker"],
     ["spektrum.de", "Spektrum"], ["allgemeine-zeitung.de", "Allgemeine Zeitung"], ["chefkoch.de", "Chefkoch"]
@@ -24,7 +25,7 @@
 
   const nw = {
     active: false,
-    cat: storageGet("pp_news_cat") || "welt",
+    cat: storageGet("pp_news_cat") || ALL,
     data: {},           // Schlüssel → { items, at, errors, loadedAt }
     loading: false,
     feeds: [],          // eigene Feeds (rss_feeds)
@@ -39,7 +40,7 @@
   const hid = () => state.household && state.household.id;
   const isFeedCat = k => k.startsWith("f:");
   const feedCats = () => [...new Set(nw.feeds.map(f => f.category))].sort((a, b) => a.localeCompare(b, "de"));
-  const validCat = k => k === STAR || CATS.some(c => c[0] === k) || (isFeedCat(k) && feedCats().includes(k.slice(2)));
+  const validCat = k => k === STAR || k === ALL || CATS.some(c => c[0] === k) || (isFeedCat(k) && feedCats().includes(k.slice(2)));
 
   function ago(iso) {
     if (!iso) return "";
@@ -131,6 +132,7 @@
   // ---------- Anzeige ----------
   function chips() {
     const list = [
+      [ALL, "📋 Alles"],
       ...CATS,
       ...feedCats().map(c => ["f:" + c, "📰 " + escapeHtml(c)]),
       [STAR, "⭐ Gemerkt"]
@@ -159,7 +161,7 @@
 
   function render() {
     if (!nw.active) return;
-    if (nw.feedsReady && !validCat(nw.cat)) nw.cat = "welt";
+    if (nw.feedsReady && !validCat(nw.cat)) nw.cat = ALL;
     chips();
     const box = $("#news-items");
 
@@ -216,7 +218,9 @@
     $("#btn-news-refresh").disabled = true;
     try {
       let data;
-      if (isFeedCat(key)) {
+      if (key === ALL) {
+        data = await loadAll();
+      } else if (isFeedCat(key)) {
         const feeds = nw.feeds.filter(f => f.category === key.slice(2)).map(f => ({ url: f.url, title: f.title }));
         data = await invoke({ action: "feeds", feeds });
       } else {
@@ -232,6 +236,29 @@
       $("#btn-news-refresh").disabled = false;
     }
     if (key === nw.cat) render();
+  }
+
+  // „Alles“: alle Rubriken und alle eigenen Feeds zusammen, neueste zuerst
+  async function loadAll() {
+    const jobs = CATS.map(([cat]) => invoke({ cat }));
+    if (nw.feeds.length) jobs.push(invoke({ action: "feeds", feeds: nw.feeds.map(f => ({ url: f.url, title: f.title })) }));
+    const res = await Promise.allSettled(jobs);
+    const ok = res.filter(r => r.status === "fulfilled").map(r => r.value || {});
+    if (!ok.length) throw (res[0] && res[0].reason) || new Error("Die Nachrichten konnten gerade nicht geladen werden.");
+    // gleiche Meldung nur einmal (gleicher Link oder gleicher Titel)
+    const seen = new Set();
+    const items = ok.flatMap(d => d.items || [])
+      .sort((a, b) => String(b.published || "").localeCompare(String(a.published || "")))
+      .filter(it => {
+        const k1 = it.link, k2 = String(it.title || "").toLowerCase().replace(/\W+/g, " ").trim();
+        if (seen.has(k1) || (k2 && seen.has(k2))) return false;
+        seen.add(k1); if (k2) seen.add(k2);
+        return true;
+      })
+      .slice(0, 250);
+    const errors = [...new Set(ok.flatMap(d => d.errors || []))];
+    if (res.some(r => r.status === "rejected")) errors.push("einige Rubriken");
+    return { at: Date.now(), items, errors };
   }
 
   async function enter() {
@@ -361,6 +388,7 @@
       if (error) { toast(translateError(error), true); return; }
       nw.feeds = nw.feeds.filter(x => x.id !== f.id);
       delete nw.data["f:" + f.category];
+      delete nw.data[ALL];
       renderFeeds();
       render();
       toast("Feed entfernt.");
@@ -388,6 +416,7 @@
       nw.feeds.push(data);
       nw.feeds.sort((a, b) => a.title.localeCompare(b.title, "de"));
       delete nw.data["f:" + data.category];
+      delete nw.data[ALL];
       resetFound();
       $("#form-rss-find").reset();
       renderFeeds();
