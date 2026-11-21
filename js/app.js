@@ -214,7 +214,11 @@
     "meintag": { id: "myday", title: "Mein Tag", module: "myday" },
     "news": { id: "news", title: "News", module: "news" },
     "archiv": { id: "archive", title: "Archiv", module: "archive" },
-    "essen": { id: "meals", title: "Essensplan", module: "meals" }
+    "essen": { id: "meals", title: "Essensplan", module: "meals" },
+    "muell": { id: "waste", title: "Müllabfuhr", module: "waste" },
+    "urlaub": { id: "trips", title: "Urlaub & Packlisten", module: "trips" },
+    "fussball": { id: "football", title: "Bundesliga", module: "football" },
+    "tanken": { id: "fuel", title: "Tankpreise", module: "fuel" }
   };
   let activeView = null;
 

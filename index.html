@@ -193,6 +193,26 @@
           <div class="tile-name">Essensplan</div>
           <div class="tile-status" id="tile-meal-status">Was gibt's heute?</div>
         </a>
+        <a class="tile tile-active tile-waste" href="#/muell">
+          <div class="tile-icon">🗑️</div>
+          <div class="tile-name">Müllabfuhr</div>
+          <div class="tile-status" id="tile-ws-status">Termine laden</div>
+        </a>
+        <a class="tile tile-active tile-trips" href="#/urlaub">
+          <div class="tile-icon">🧳</div>
+          <div class="tile-name">Urlaub</div>
+          <div class="tile-status" id="tile-tr-status">Packlisten</div>
+        </a>
+        <a class="tile tile-active tile-football" href="#/fussball">
+          <div class="tile-icon">⚽</div>
+          <div class="tile-name">Bundesliga</div>
+          <div class="tile-status" id="tile-fb-status">Spieltag & Tabelle</div>
+        </a>
+        <a class="tile tile-active tile-fuel" href="#/tanken">
+          <div class="tile-icon">⛽</div>
+          <div class="tile-name">Tankpreise</div>
+          <div class="tile-status" id="tile-fu-status">Preise ansehen</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -393,6 +413,52 @@
         </div>
         <div id="recipe-items"></div>
       </div>
+     </div>
+
+     <!-- ===== Müllabfuhr ===== -->
+     <div id="view-waste" class="view" hidden>
+      <div class="btn-row ws-bar">
+        <button class="btn btn-small" id="btn-ws-file">📥 ICS-Datei laden</button>
+        <button class="btn btn-small" id="btn-ws-old">🧹 Alte Müll-Aufgaben aufräumen</button>
+        <input type="file" id="ws-file" accept=".ics,text/calendar" hidden>
+      </div>
+      <div id="ws-items"></div>
+      <form id="form-ws-push" class="card jn-reminder" autocomplete="off">
+        <label class="switch"><input type="checkbox" name="enabled" checked><span>🔔 Am Vorabend erinnern (Mitteilung aufs Handy)</span></label>
+        <label id="ws-push-time" class="jn-reminder-time">um
+          <input type="time" name="time" step="900" value="19:00"> Uhr
+        </label>
+        <p class="muted small">Gilt nur für dich. In der Tages-Mail stehen die Abholungen automatisch mit drin.</p>
+      </form>
+     </div>
+
+     <!-- ===== Urlaub & Packlisten ===== -->
+     <div id="view-trips" class="view" hidden>
+      <div class="note-toolbar tr-toolbar">
+        <span></span>
+        <button class="btn btn-small" id="btn-tr-add">+ Reise</button>
+      </div>
+      <div id="tr-body"></div>
+     </div>
+
+     <!-- ===== Bundesliga ===== -->
+     <div id="view-football" class="view" hidden>
+      <div class="news-bar">
+        <div class="chips" id="fb-tabs"></div>
+        <button class="icon-btn" id="btn-fb-refresh" aria-label="Neu laden" title="Neu laden">↻</button>
+      </div>
+      <div class="chips" id="fb-leagues"></div>
+      <div id="fb-body"></div>
+      <p class="muted small">Daten: <a href="https://www.openligadb.de" target="_blank" rel="noopener">OpenLigaDB</a></p>
+     </div>
+
+     <!-- ===== Tankpreise ===== -->
+     <div id="view-fuel" class="view" hidden>
+      <div class="news-bar">
+        <div class="chips" id="fu-types"></div>
+        <button class="icon-btn" id="btn-fu-refresh" aria-label="Neu laden" title="Neu laden">↻</button>
+      </div>
+      <div id="fu-body"></div>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -970,6 +1036,71 @@
       <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
     </div>
     <div class="arp-body" id="arp-body"></div>
+  </div>
+
+  <div id="sheet-ws-import" class="sheet" hidden role="dialog" aria-label="Abholtermine übernehmen">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Abholtermine übernehmen</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="ws-preview"></div>
+    <button type="button" class="btn btn-primary btn-block" id="btn-ws-import">Übernehmen</button>
+  </div>
+
+  <div id="sheet-ws-old" class="sheet sheet-tall" hidden role="dialog" aria-label="Alte Müll-Aufgaben">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Alte Müll-Aufgaben</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <p class="muted small">Diese Aufgaben sehen nach Müllabfuhr aus. Die Termine kommen jetzt aus dem Abfallkalender – angehakte Aufgaben werden gelöscht, damit nichts doppelt erscheint.</p>
+    <ul class="ar-imp-list" id="ws-old-list"></ul>
+    <button type="button" class="btn btn-primary btn-block" id="btn-ws-old-delete">Ausgewählte löschen</button>
+  </div>
+
+  <div id="sheet-fb-teams" class="sheet sheet-tall" hidden role="dialog" aria-label="Lieblingsvereine">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Meine Vereine</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <p class="muted small">Bis zu 6 Vereine – gilt nur für dich.</p>
+    <div id="fb-team-list"></div>
+    <button type="button" class="btn btn-primary btn-block" id="btn-fb-teams-save">Speichern</button>
+  </div>
+
+  <div id="sheet-trip" class="sheet" hidden role="dialog" aria-label="Reise">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="trip-sheet-title">Neue Reise</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-trip" class="form" autocomplete="off">
+      <label>Name
+        <input type="text" name="title" maxlength="120" placeholder="z. B. Sommerurlaub Italien" required>
+      </label>
+      <label class="switch"><input type="checkbox" name="is_template"><span>📋 Nur Vorlage (ohne Datum)</span></label>
+      <div class="form-row form-row-even">
+        <label>Von <input type="date" name="start_date"></label>
+        <label>Bis <input type="date" name="end_date"></label>
+      </div>
+      <label id="trip-from-row">Packliste aus Vorlage
+        <select name="from_template"></select>
+      </label>
+      <label>Reiseunterlagen aus dem Archiv <span class="hint">(Dokumente mit diesem Tag)</span>
+        <select name="tag_id"></select>
+      </label>
+      <label>Notiz <span class="hint">(optional)</span>
+        <textarea name="note" rows="2" maxlength="2000" placeholder="z. B. Unterkunft, Flugzeiten"></textarea>
+      </label>
+      <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div class="note-actions">
+      <span></span>
+      <button type="button" class="link danger-link" id="btn-trip-delete" hidden>Löschen</button>
+    </div>
   </div>
 
   <div id="sheet-hidrive" class="sheet" hidden role="dialog" aria-label="HiDrive verbinden">
@@ -1585,6 +1716,7 @@
       <label class="switch"><input type="checkbox" id="cal-show-notes"><span>📝 Notizen mit Datum anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-bdays"><span>🎂 Geburtstage anzeigen</span></label>
       <label class="switch"><input type="checkbox" id="cal-show-meals"><span>🍽️ Abendessen anzeigen</span></label>
+      <label class="switch"><input type="checkbox" id="cal-show-waste"><span>🗑️ Müllabfuhr anzeigen</span></label>
       <p class="muted small">Gilt für dieses Gerät.</p>
     </div>
 
@@ -1886,5 +2018,9 @@
   <script src="/js/tags.js"></script>
   <script src="/js/meals.js"></script>
   <script src="/js/aiusage.js"></script>
+  <script src="/js/waste.js"></script>
+  <script src="/js/football.js"></script>
+  <script src="/js/fuel.js"></script>
+  <script src="/js/trips.js"></script>
 </body>
 </html>

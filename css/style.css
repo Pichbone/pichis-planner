@@ -1635,3 +1635,92 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .aiu-table th:not(:first-child), .aiu-table td:not(:first-child) { text-align: right; white-space: nowrap; }
 .aiu-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
 .aiu-form button { grid-column: 1 / -1; }
+
+/* =========================================================
+   Müllabfuhr, Urlaub, Bundesliga, Tankpreise
+   ========================================================= */
+:root { --waste: #4B5563; --waste-soft: #ECEEF1; --trips: #0E7490; --trips-soft: #DDF1F5; --fb: #B91C1C; --fb-soft: #F9E1E1; --fuel: #1D4ED8; --fuel-soft: #E0E8FB; }
+@media (prefers-color-scheme: dark) { :root { --waste: #C3C8D0; --waste-soft: #23262B; --trips: #67C6DA; --trips-soft: #15282D; --fb: #F48A8A; --fb-soft: #2E1C1C; --fuel: #93B2F5; --fuel-soft: #1A2236; } }
+.tile-waste { border-color: var(--waste); background: var(--waste-soft); } .tile-waste .tile-status { color: var(--waste); }
+.tile-trips { border-color: var(--trips); background: var(--trips-soft); } .tile-trips .tile-status { color: var(--trips); }
+.tile-football { border-color: var(--fb); background: var(--fb-soft); } .tile-football .tile-status { color: var(--fb); }
+.tile-fuel { border-color: var(--fuel); background: var(--fuel-soft); } .tile-fuel .tile-status { color: var(--fuel); }
+.tile.tile-alert .tile-status { font-weight: 700; }
+
+/* Müll */
+.ws-bar { margin-bottom: 12px; }
+.ws-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.ws-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.ws-list li.is-tomorrow { border-color: var(--orange, #E0703F); box-shadow: 0 0 0 1px var(--orange, #E0703F) inset; }
+.ws-list li.is-today { border-color: var(--green); }
+.ws-date { width: 92px; flex-shrink: 0; font-weight: 700; font-size: .9rem; }
+.ws-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.ws-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; font-size: .85rem; font-weight: 600;
+  background: color-mix(in srgb, var(--ws) 16%, transparent); border: 1px solid color-mix(in srgb, var(--ws) 45%, transparent); }
+.cal-waste .event-title { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Urlaub */
+.tr-toolbar { justify-content: flex-end; }
+.tr-head { margin-bottom: 8px; }
+.tr-title { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; font-size: 1.1rem; }
+.tr-count { font-size: 1.5rem; font-weight: 700; margin: 6px 0 2px; color: var(--trips); }
+.tr-note { white-space: pre-wrap; }
+.tr-progress { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin-top: 10px; }
+.tr-progress span { display: block; height: 100%; background: var(--trips); border-radius: 99px; transition: width .3s; }
+.tr-section { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 2px 4px; }
+.tr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tr-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.tr-item.done .tr-text { text-decoration: line-through; color: var(--muted); }
+.tr-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tr-who { border: 1px solid var(--line); background: var(--surface-2); border-radius: 99px; min-width: 32px; height: 28px; font-size: .75rem; font-weight: 700; cursor: pointer; color: var(--ink); }
+.tr-add { display: grid; grid-template-columns: 1fr 110px auto; gap: 6px; margin: 12px 0; }
+.tr-add input { min-width: 0; padding: 9px 10px; }
+.tr-actions { align-items: center; margin-bottom: 8px; }
+.tr-actions select { max-width: 220px; }
+.tr-past { margin-top: 12px; } .tr-past summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: 6px 2px; }
+
+/* Bundesliga */
+#fb-leagues { margin: 6px 0 10px; }
+.fb-card { margin-bottom: 10px; }
+.fb-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fb-card-head .muted { flex: 1; }
+.fb-forms { display: inline-flex; gap: 3px; }
+.fb-form { width: 20px; height: 20px; border-radius: 5px; display: inline-grid; place-items: center; font-size: .7rem; font-weight: 800; color: #fff; }
+.fb-form.S { background: #16A34A; } .fb-form.U { background: #9CA3AF; } .fb-form.N { background: #DC2626; }
+.fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fb-match { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: "when when when" "home score away"; align-items: center; gap: 2px 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.fb-match.is-live { border-color: #DC2626; }
+.fb-when { grid-area: when; font-size: .75rem; color: var(--muted); font-weight: 600; }
+.fb-home { grid-area: home; justify-content: flex-end; text-align: right; }
+.fb-away { grid-area: away; }
+.fb-team { display: flex; align-items: center; gap: 6px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.fb-team.fav { color: var(--fb); font-weight: 800; }
+.fb-logo { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
+.fb-score, .fb-time { grid-area: score; min-width: 46px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; padding: 2px 6px; border-radius: 6px; background: var(--surface-2); }
+.fb-time { font-weight: 600; color: var(--muted); }
+.fb-score.live { background: #DC2626; color: #fff; }
+.fb-daybar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.fb-daybar strong { flex: 1; text-align: center; }
+.fb-table { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 8px; }
+.fb-table th { text-align: left; font-size: .72rem; text-transform: uppercase; color: var(--muted); padding: 4px; }
+.fb-table td { padding: 6px 4px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.fb-table th:not(:nth-child(2)), .fb-table td:not(:nth-child(2)) { text-align: right; }
+.fb-tname { display: flex; align-items: center; gap: 6px; }
+.fb-table tr.fav td { background: var(--fb-soft); font-weight: 700; }
+.fb-table tr.z-cl td:first-child, .fb-table tr.z-up td:first-child { box-shadow: inset 3px 0 0 #16A34A; }
+.fb-table tr.z-el td:first-child { box-shadow: inset 3px 0 0 #2563EB; }
+.fb-table tr.z-rel td:first-child { box-shadow: inset 3px 0 0 #F59E0B; }
+.fb-table tr.z-down td:first-child { box-shadow: inset 3px 0 0 #DC2626; }
+#btn-fb-teams { margin: 4px 0 12px; }
+
+/* Tankpreise */
+.fu-card { margin-bottom: 10px; }
+.fu-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.fu-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fu-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); color: inherit; text-decoration: none; }
+.fu-row.best { box-shadow: inset 0 0 0 2px #16A34A; }
+.fu-price { font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 74px; }
+.fu-price sup { font-size: .65em; }
+.fu-text { display: flex; flex-direction: column; min-width: 0; }
+.fu-name { font-weight: 700; }
+.fu-foot { margin-top: 8px; }

@@ -30,6 +30,8 @@
     showNotes: storageGet("pp_cal_notes") !== "0",
     showBdays: storageGet("pp_cal_bdays") !== "0",
     showMeals: storageGet("pp_cal_meals") !== "0",
+    showWaste: storageGet("pp_cal_waste") !== "0",
+    waste: [],
     meals: [],
     notes: [],
     bdays: [],
@@ -135,6 +137,13 @@
         .then(r => { cal.meals = r.error ? [] : (r.data || []); }));
     } else {
       cal.meals = [];
+    }
+    if (cal.showWaste) {
+      jobs.push(sb.from("waste_dates").select("day, kind, title").eq("household_id", hid)
+        .gte("day", isoDate(start)).lt("day", isoDate(end))
+        .then(r => { cal.waste = r.error ? [] : (r.data || []); }));
+    } else {
+      cal.waste = [];
     }
     if (cal.showBdays) {
       jobs.push(sb.from("birthdays")
@@ -348,7 +357,8 @@
       const dots = list.slice(0, 4).map(ev => `<i style="background:${escapeHtml(ev.calendar_color)}"></i>`).join("") +
         (cal.showTodos && cal.todos.some(t => t.due_date === iso && !t.is_done) ? '<i class="todo-dot"></i>' : "") +
         (cal.showNotes && cal.notes.some(n => n.note_date === iso) ? '<i class="note-dot"></i>' : "") +
-        (bdaysOn(iso).length ? '<i class="bday-dot"></i>' : "");
+        (bdaysOn(iso).length ? '<i class="bday-dot"></i>' : "") +
+        (cal.showWaste && PP.waste && cal.waste.some(w => w.day === iso) ? `<i style="background:${PP.waste.KINDS[cal.waste.find(w => w.day === iso).kind].color}"></i>` : "");
       grid += `<button class="${cls.join(" ")}" data-day="${iso}" aria-label="${longDate(iso)}, ${list.length} Termine">
         <span class="num">${d.getDate()}</span><span class="dots">${dots}${list.length > 4 ? "<b>+</b>" : ""}</span>
       </button>`;
@@ -385,6 +395,13 @@
       if (dish) extra += `<h4 class="cal-sub">🍽️ Abendessen</h4><a class="cal-shop cal-meal" href="#/essen">
         <span class="event-title">${escapeHtml(dish)}</span>
         <span class="event-sub">${meal.recipe_id ? `für ${meal.servings} Personen` : "Essensplan"}</span></a>`;
+    }
+
+    // Müllabfuhr des Tages
+    const ws = cal.showWaste && PP.waste ? PP.waste.on(cal.waste, cal.selected) : [];
+    if (ws.length) {
+      extra += `<h4 class="cal-sub">🗑️ Müllabfuhr</h4><a class="cal-shop cal-waste" href="#/muell">
+        <span class="event-title">${ws.map(PP.waste.chip).join("")}</span></a>`;
     }
 
     // Geburtstage des Tages
@@ -1030,6 +1047,7 @@
     $("#cal-show-notes").checked = cal.showNotes;
     $("#cal-show-bdays").checked = cal.showBdays;
     $("#cal-show-meals").checked = cal.showMeals;
+    $("#cal-show-waste").checked = cal.showWaste;
 
     $("#cal-tag-list").innerHTML = cal.tags.length
       ? cal.tags.map(t => `<li class="cal-row">${tagChip(t)}<button class="icon-btn small" data-del-tag="${t.id}" aria-label="Tag löschen">✕</button></li>`).join("")
@@ -1038,7 +1056,9 @@
 
   $("#sheet-calsettings").addEventListener("change", async e => {
     const t = e.target;
-    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes" || t.id === "cal-show-bdays" || t.id === "cal-show-meals") {
+    if (t.id === "cal-show-todos" || t.id === "cal-show-shop" || t.id === "cal-show-notes" || t.id === "cal-show-bdays" || t.id === "cal-show-meals" || t.id === "cal-show-waste") {
+      cal.showWaste = $("#cal-show-waste").checked;
+      storageSet("pp_cal_waste", cal.showWaste ? "1" : "0");
       cal.showMeals = $("#cal-show-meals").checked;
       storageSet("pp_cal_meals", cal.showMeals ? "1" : "0");
       cal.showTodos = $("#cal-show-todos").checked;

@@ -4,7 +4,8 @@
 window.PP_CONFIG = {
   SUPABASE_URL: "https://pgevrbsvyinowxrpxgpp.supabase.co",
   SUPABASE_KEY: "sb_publishable_q2ZVeMgvJyqgE_vty9zXJA_hk_vCyjm",
-  APP_VERSION: "0.44.0",
+  FOOTBALL_DEFAULT: ["1. FC Kaiserslautern"],
+  APP_VERSION: "0.45.0",
   // Ort für das Wetter oben auf der Startseite (für alle gleich)
   WEATHER: { name: "Bodenheim", lat: 49.9294, lon: 8.3117 }
 };
