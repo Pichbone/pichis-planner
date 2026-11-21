@@ -1618,3 +1618,20 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .nutri-grid dt { color: var(--muted); font-size: .85rem; }
 .nutri-grid dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .nutri-stale { color: var(--orange, #C2410C); }
+
+/* KI-Verbrauch (Einstellungen, nur Verwaltung) */
+.aiu-credit { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 10px; padding: 12px 14px; border-radius: 14px; background: rgba(47, 93, 80, .12); margin-bottom: 10px; }
+.aiu-credit b { font-size: 1.4rem; }
+.aiu-credit small { grid-column: 1 / -1; color: var(--muted); }
+.aiu-credit.low { background: rgba(224, 112, 63, .16); }
+.aiu-range { margin-bottom: 8px; }
+.aiu-total { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.aiu-total div { padding: 10px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; }
+.aiu-total b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.aiu-total small { color: var(--muted); font-size: .75rem; }
+.aiu-table { width: 100%; border-collapse: collapse; margin: 4px 0 12px; font-size: .88rem; }
+.aiu-table th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; padding: 4px 4px; }
+.aiu-table td { padding: 6px 4px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.aiu-table th:not(:first-child), .aiu-table td:not(:first-child) { text-align: right; white-space: nowrap; }
+.aiu-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
+.aiu-form button { grid-column: 1 / -1; }
