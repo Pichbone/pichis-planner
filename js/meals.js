@@ -150,6 +150,90 @@
   };
 
   // =========================================================
+  // Nährwerte je Portion (KI-Schätzung aus den Zutaten, Schritt 36)
+  // =========================================================
+  const nutKey = r => `${r.servings}|${String(r.ingredients || "").split("\n").map(l => l.trim().toLowerCase()).filter(Boolean).join("\n")}`;
+  const nutOk = r => r && r.nutrition && r.nutrition.kcal != null && r.nutrition_for === nutKey(r);
+  const kcalText = r => nutOk(r) ? `≈ ${Math.round(r.nutrition.kcal)} kcal` : "";
+  const fmtG = v => v == null ? "–" : `${String(v).replace(".", ",")} g`;
+  const nutBusy = new Set();
+
+  async function calcNutrition(r) {
+    if (!r || !String(r.ingredients || "").trim() || nutBusy.has(r.id)) return null;
+    nutBusy.add(r.id);
+    try {
+      const { data, error } = await sb.functions.invoke("assist", { body: { action: "nutrition", name: r.name, servings: r.servings, ingredients: r.ingredients } });
+      if (error) {
+        let msg = error.message;
+        try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+        throw new Error(msg);
+      }
+      const key = nutKey(r);
+      const { error: e2 } = await sb.from("recipes").update({ nutrition: data, nutrition_for: key }).eq("id", r.id);
+      if (e2) throw new Error(/nutrition/.test(e2.message || "") ? "Bitte zuerst das SQL aus Schritt 36 in Supabase ausführen." : translateError(e2));
+      const cur = ml.recipes.find(x => x.id === r.id);
+      if (cur) { cur.nutrition = data; cur.nutrition_for = key; }
+      return data;
+    } finally {
+      nutBusy.delete(r.id);
+    }
+  }
+
+  function renderNutrition() {
+    const box = $("#recipe-nutrition");
+    const r = ml.editRecipe && ml.recipes.find(x => x.id === ml.editRecipe.id);
+    if (!r) { box.hidden = true; return; }
+    box.hidden = false;
+    if (nutBusy.has(r.id)) { box.innerHTML = `<p class="muted small">🔢 Nährwerte werden berechnet …</p>`; return; }
+    if (!String(r.ingredients || "").trim()) { box.innerHTML = `<p class="muted small">Nährwerte: erst Zutaten eintragen.</p>`; return; }
+    const n = r.nutrition;
+    if (!n || n.kcal == null) {
+      box.innerHTML = `<button type="button" class="btn btn-small" id="btn-nutri">🔢 Nährwerte pro Portion berechnen</button>`;
+      return;
+    }
+    const stale = !nutOk(r);
+    box.innerHTML = `<div class="nutri-head"><strong>Pro Portion</strong><span class="muted small">KI-Schätzung · Verlässlichkeit ${escapeHtml(n.confidence || "mittel")}</span></div>
+      <div class="nutri-kcal">${Math.round(n.kcal)} <small>kcal</small></div>
+      <dl class="nutri-grid">
+        <div><dt>Kohlenhydrate</dt><dd>${fmtG(n.carbs)}</dd></div>
+        <div><dt>davon Zucker</dt><dd>${fmtG(n.sugar)}</dd></div>
+        <div><dt>Fett</dt><dd>${fmtG(n.fat)}</dd></div>
+        <div><dt>davon gesättigt</dt><dd>${fmtG(n.saturated)}</dd></div>
+        <div><dt>Eiweiß</dt><dd>${fmtG(n.protein)}</dd></div>
+        <div><dt>Ballaststoffe</dt><dd>${fmtG(n.fiber)}</dd></div>
+        <div><dt>Salz</dt><dd>${fmtG(n.salt)}</dd></div>
+      </dl>
+      ${n.note ? `<p class="muted small">${escapeHtml(n.note)}</p>` : ""}
+      ${stale ? `<p class="small nutri-stale">Zutaten oder Portionen wurden geändert – <button type="button" class="link" id="btn-nutri">neu berechnen</button></p>`
+              : `<button type="button" class="link small" id="btn-nutri">neu berechnen</button>`}`;
+  }
+
+  async function nutriFor(r, quiet) {
+    renderNutrition();
+    try {
+      await calcNutrition(r);
+      if (!quiet) toast("Nährwerte berechnet.");
+    } catch (err) {
+      toast(`Nährwerte: ${err.message}`, true);
+    }
+    renderNutrition();
+    if (ml.active) render();
+  }
+
+  async function nutriAll(btn) {
+    const todo = ml.recipes.filter(r => String(r.ingredients || "").trim() && !nutOk(r));
+    if (!todo.length) return;
+    btn.disabled = true;
+    let ok = 0, bad = 0, lastErr = "";
+    for (const r of todo) {
+      btn.textContent = `🔢 ${ok + bad + 1}/${todo.length} …`;
+      try { await calcNutrition(r); ok++; } catch (err) { bad++; lastErr = err.message; if (/Schritt 36/.test(lastErr)) break; }
+    }
+    render();
+    toast(bad ? `${ok} berechnet, ${bad} nicht: ${lastErr}` : `Nährwerte für ${ok} Rezept${ok === 1 ? "" : "e"} berechnet.`, !!bad);
+  }
+
+  // =========================================================
   // Darstellung
   // =========================================================
   function render() {
@@ -177,7 +261,7 @@
         <span class="meal-date"><b>${WD[i]}</b><small>${parse(d).getDate()}.${parse(d).getMonth() + 1}.</small></span>
         <span class="meal-main">
           ${dish ? `<span class="meal-dish">${r && r.is_favorite ? "⭐ " : ""}${escapeHtml(dish)}</span>
-            <span class="meal-sub">${[r ? `für ${entry.servings}` : "", entry.note].filter(Boolean).map(escapeHtml).join(" · ")}</span>`
+            <span class="meal-sub">${[r ? `für ${entry.servings}` : "", r ? kcalText(r) + (kcalText(r) ? "/Portion" : "") : "", entry.note].filter(Boolean).map(escapeHtml).join(" · ")}</span>`
           : `<span class="meal-empty">+ Abendessen planen</span>`}
         </span>
       </button></li>`;
@@ -195,13 +279,15 @@
     const list = ml.recipes
       .filter(r => !q || r.name.toLowerCase().includes(q) || r.ingredients.toLowerCase().includes(q))
       .sort((a, b) => (b.is_favorite - a.is_favorite) || a.name.localeCompare(b.name, "de"));
+    const missing = ml.recipes.filter(r => String(r.ingredients || "").trim() && !nutOk(r)).length;
     $("#recipe-items").innerHTML = list.length
-      ? `<ul class="ar-list">${list.map(r => {
+      ? (missing ? `<div class="ar-recipe-bar"><span>🔢 ${missing} Rezept${missing === 1 ? "" : "e"} ohne aktuelle Nährwerte</span><button class="btn btn-small" id="btn-nutri-all">Berechnen</button></div>` : "") +
+        `<ul class="ar-list">${list.map(r => {
           const n = r.ingredients.split("\n").filter(l => l.trim()).length;
           return `<li><button class="ar-doc" data-recipe="${r.id}">
             <span class="ar-icon">${r.is_favorite ? "⭐" : "🍲"}</span>
             <span class="ar-main"><span class="ar-title">${escapeHtml(r.name)}</span>
-            <span class="ar-sub">für ${r.servings} · ${n} Zutat${n === 1 ? "" : "en"}${r.url ? " · 🔗" : ""}${r.archive_doc_id ? " · 📄" : ""}</span></span>
+            <span class="ar-sub">für ${r.servings} · ${n} Zutat${n === 1 ? "" : "en"}${nutOk(r) ? ` · ${kcalText(r)}` : ""}${r.url ? " · 🔗" : ""}${r.archive_doc_id ? " · 📄" : ""}</span></span>
           </button></li>`;
         }).join("")}</ul>`
       : `<div class="empty"><div class="empty-icon">📖</div><p><strong>${ml.recipes.length ? "Nichts gefunden." : "Noch keine Rezepte."}</strong></p>
@@ -307,6 +393,7 @@
     $("#recipe-link").innerHTML = r && /^https?:\/\//.test(r.url) ? `<a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">🔗 Rezept im Netz öffnen</a>` : "";
     $("#recipe-original").hidden = !(r && r.archive_doc_id && PP.archiveDoc);
     previewIngredients();
+    renderNutrition();
     openSheet("sheet-recipe");
     if (!r) setTimeout(() => f.name.focus(), 60);
   }
@@ -352,7 +439,21 @@
       toast(f.plan_day.value ? "Gespeichert und eingeplant." : "Rezept gespeichert.");
       await Promise.all([loadRecipes(), loadWeek()]);
       render();
+      // Nährwerte neu schätzen, wenn sich Zutaten oder Portionen geändert haben
+      const saved = ml.recipes.find(x => x.id === id);
+      if (saved && row.ingredients && !nutOk(saved)) nutriFor(saved, true);
     });
+  });
+
+  $("#recipe-nutrition").addEventListener("click", e => {
+    if (e.target.closest("#btn-nutri")) {
+      const r = ml.editRecipe && ml.recipes.find(x => x.id === ml.editRecipe.id);
+      if (r) nutriFor(r, false);
+    }
+  });
+  $("#recipe-items").addEventListener("click", e => {
+    const b = e.target.closest("#btn-nutri-all");
+    if (b) nutriAll(b);
   });
 
   $("#btn-recipe-original").addEventListener("click", () => {

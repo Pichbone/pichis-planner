@@ -1607,3 +1607,14 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .topbar-clock { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .clock-time { font-variant-numeric: tabular-nums; }
 .clock-time::before { content: " · "; }
+
+/* Essensplan: Nährwerte */
+.nutri { margin: 4px 0 8px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.nutri-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.nutri-kcal { font-size: 1.6rem; font-weight: 700; margin: 4px 0 6px; }
+.nutri-kcal small { font-size: .85rem; font-weight: 600; color: var(--muted); }
+.nutri-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; margin: 0 0 6px; }
+.nutri-grid div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; }
+.nutri-grid dt { color: var(--muted); font-size: .85rem; }
+.nutri-grid dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.nutri-stale { color: var(--orange, #C2410C); }
