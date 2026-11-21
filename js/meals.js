@@ -209,11 +209,11 @@
   }
 
   // ---------- Freie Gerichte (ohne Rezept): KI schätzt eine übliche Portion ----------
-  const dishKey = e => `${String(e.title || "").trim().toLowerCase()}|${String(e.components || "").split("\n").map(l => l.trim().toLowerCase()).filter(Boolean).join("\n")}`;
+  const dishKey = e => `${String(e.title || "").trim().toLowerCase()}|${e.servings || 1}|${String(e.components || "").split("\n").map(l => l.trim().toLowerCase()).filter(Boolean).join("\n")}`;
   const dishOk = e => e && !e.recipe_id && e.nutrition && e.nutrition.kcal != null && e.nutrition_for === dishKey(e);
 
   async function calcDish(entry) {
-    const { data, error } = await sb.functions.invoke("assist", { body: { action: "nutrition", dish: true, name: entry.title, components: entry.components || "" } });
+    const { data, error } = await sb.functions.invoke("assist", { body: { action: "nutrition", dish: true, name: entry.title, components: entry.components || "", servings: entry.servings || 1 } });
     if (error) {
       let msg = error.message;
       try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
