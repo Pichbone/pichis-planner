@@ -131,7 +131,7 @@
     }
     if (cal.showMeals) {
       jobs.push(sb.from("meal_plan")
-        .select("day, title, servings, recipe_id, recipes(name)")
+        .select("*, recipes(name)")
         .eq("household_id", hid)
         .gte("day", isoDate(start)).lt("day", isoDate(end))
         .then(r => { cal.meals = r.error ? [] : (r.data || []); }));
@@ -389,13 +389,16 @@
 
     // Abendessen des Tages
     let extra = "";
-    const meal = cal.showMeals && cal.meals.find(m => m.day === cal.selected);
-    if (meal) {
+    const meals = cal.showMeals ? cal.meals.filter(m => m.day === cal.selected) : [];
+    const mealHtml = meals.map(meal => {
       const dish = (meal.recipes && meal.recipes.name) || meal.title || (meal.recipe_id ? "Geplantes Gericht" : "");
-      if (dish) extra += `<h4 class="cal-sub">🍽️ Abendessen</h4><a class="cal-shop cal-meal" href="#/essen">
+      if (!dish) return "";
+      const who = Array.isArray(meal.eaters) && meal.eaters.length ? meal.eaters.map(id => memberName(id)).filter(Boolean).join(", ") : "";
+      return `<a class="cal-shop cal-meal" href="#/essen">
         <span class="event-title">${escapeHtml(dish)}</span>
-        <span class="event-sub">${meal.recipe_id ? `für ${meal.servings} Personen` : "Essensplan"}</span></a>`;
-    }
+        <span class="event-sub">${escapeHtml(who ? `für ${who}` : `für ${meal.servings} Personen`)}</span></a>`;
+    }).join("");
+    if (mealHtml) extra += `<h4 class="cal-sub">🍽️ Abendessen</h4>${mealHtml}`;
 
     // Müllabfuhr des Tages
     const ws = cal.showWaste && PP.waste ? PP.waste.on(cal.waste, cal.selected) : [];

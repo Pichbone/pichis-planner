@@ -922,7 +922,12 @@
       <h2 id="meal-sheet-title">Abendessen</h2>
       <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
     </div>
+    <div class="chips meal-entries" id="meal-entries"></div>
     <form id="form-meal" class="form" autocomplete="off">
+      <div>
+        <span class="field-label">Wer isst mit? <span class="hint">(niemand gewählt = alle)</span></span>
+        <div class="chip-wrap" id="meal-eaters"></div>
+      </div>
       <div>
         <span class="field-label">Aus den Rezepten</span>
         <input type="search" id="meal-search" placeholder="Rezept suchen" aria-label="Rezept suchen">

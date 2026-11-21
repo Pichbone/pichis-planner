@@ -47,7 +47,7 @@
       loadEvents(today).catch(() => []),
       q(sb.from("todos").select("title, due_date, due_time, priority").eq("household_id", hid).eq("is_done", false).lte("due_date", today)
         .order("due_time", { ascending: true, nullsFirst: false }).limit(50)),
-      q(sb.from("meal_plan").select("title, recipe_id, recipes(name)").eq("household_id", hid).eq("day", today).maybeSingle()),
+      q(sb.from("meal_plan").select("*, recipes(name)").eq("household_id", hid).eq("day", today)),
       q(sb.from("waste_dates").select("day, kind, title").eq("household_id", hid).in("day", [today, tomorrow])),
       q(sb.from("birthdays").select("id, name, birth_month, birth_day, birth_year, is_private").eq("household_id", hid))
     ]);
@@ -79,7 +79,11 @@
         sub: [over ? `${over} überfällig` : "", first ? `${first.due_time ? String(first.due_time).slice(0, 5) + " " : ""}${first.title}` : ""].filter(Boolean).join(" · ") });
     }
     // Abendessen
-    const dish = d.meal && ((d.meal.recipes && d.meal.recipes.name) || d.meal.title);
+    // eigenes Gericht (oder eins „für alle“)
+    const me = state.session.user.id;
+    const meals = Array.isArray(d.meal) ? d.meal : (d.meal ? [d.meal] : []);
+    const mine = meals.filter(m => !Array.isArray(m.eaters) || !m.eaters.length || m.eaters.includes(me));
+    const dish = mine.map(m => (m.recipes && m.recipes.name) || m.title).filter(Boolean).join(" / ");
     if (dish) out.push({ icon: "🍽️", href: "#/essen", main: dish, sub: "Abendessen" });
     // Müllabfuhr (heute oder morgen)
     const W = PP.waste;

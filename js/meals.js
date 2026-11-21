@@ -7,7 +7,7 @@
   "use strict";
 
   const PP = window.PP;
-  const { sb, state, $, toast, escapeHtml, translateError, storageGet, storageSet, openSheet, closeSheets } = PP;
+  const { sb, state, $, toast, escapeHtml, translateError, storageGet, storageSet, openSheet, closeSheets, memberName } = PP;
 
   const WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
   const WD_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
@@ -24,6 +24,9 @@
     editDay: null,
     editRecipe: null,
     pickRecipe: null,
+    editEntryId: null, // bearbeitetes Gericht (null = neues)
+    eaters: [],        // „Wer isst mit?“ (leer = alle)
+    linkEntryId: null, // „Als Rezept anlegen“: dieses Gericht mit dem neuen Rezept verknüpfen
     shopRows: [],
     channel: null
   };
@@ -129,7 +132,8 @@
   }
   async function loadWeek() {
     const from = iso(ml.weekStart), to = iso(addDays(ml.weekStart, 6));
-    const { data, error } = await sb.from("meal_plan").select("*").eq("household_id", hid()).gte("day", from).lte("day", to);
+    const { data, error } = await sb.from("meal_plan").select("*").eq("household_id", hid()).gte("day", from).lte("day", to)
+      .order("day").order("sort", { ascending: true }).order("created_at", { ascending: true });
     if (error) throw error;
     ml.plan = data.filter(x => x.day >= from && x.day <= to);
   }
@@ -142,6 +146,12 @@
       .subscribe();
   }
   function unsubscribe() { if (ml.channel) { sb.removeChannel(ml.channel); ml.channel = null; } }
+
+  // Wer isst mit? (leer = alle)
+  const eatersOf = e => (e && Array.isArray(e.eaters) ? e.eaters : []);
+  const forMe = e => !eatersOf(e).length || eatersOf(e).includes(state.session.user.id);
+  const initials = id => { const n = memberName(id) || "?"; return n.slice(0, 2); };
+  const entriesOn = d => ml.plan.filter(x => x.day === d);
 
   const dishOf = e => {
     if (!e) return "";
@@ -220,16 +230,16 @@
       throw new Error(msg);
     }
     const key = dishKey(entry);
-    const { error: e2 } = await sb.from("meal_plan").update({ nutrition: data, nutrition_for: key }).eq("household_id", hid()).eq("day", entry.day);
+    const { error: e2 } = await sb.from("meal_plan").update({ nutrition: data, nutrition_for: key }).eq("id", entry.id);
     if (e2) throw new Error(/nutrition|components/.test(e2.message || "") ? "Bitte zuerst das SQL aus Schritt 39 in Supabase ausführen." : translateError(e2));
-    const cur = ml.plan.find(x => x.day === entry.day);
+    const cur = ml.plan.find(x => x.id === entry.id);
     if (cur) { cur.nutrition = data; cur.nutrition_for = key; }
     return data;
   }
 
   function renderMealNutri() {
     const box = $("#meal-nutri");
-    const entry = ml.plan.find(x => x.day === ml.editDay);
+    const entry = ml.editEntryId ? ml.plan.find(x => x.id === ml.editEntryId) : null;
     const f = $("#form-meal");
     $("#meal-free").hidden = !!ml.pickRecipe;
     $("#btn-meal-to-recipe").hidden = !!ml.pickRecipe || !f.title.value.trim();
@@ -288,15 +298,18 @@
     let html = "";
     for (let i = 0; i < 7; i++) {
       const d = iso(addDays(s, i));
-      const entry = ml.plan.find(x => x.day === d);
-      const dish = dishOf(entry);
-      const r = entry && entry.recipe_id && ml.recipes.find(x => x.id === entry.recipe_id);
+      const list = entriesOn(d);
+      const one = entry => {
+        const dish = dishOf(entry);
+        const r = entry.recipe_id && ml.recipes.find(x => x.id === entry.recipe_id);
+        const who = eatersOf(entry).length ? `<span class="meal-who">${eatersOf(entry).map(id => `<i title="${escapeHtml(memberName(id) || "")}">${escapeHtml(initials(id))}</i>`).join("")}</span>` : "";
+        return `<span class="meal-one${list.length > 1 && !forMe(entry) ? " not-mine" : ""}"><span class="meal-dish">${who}${r && r.is_favorite ? "⭐ " : ""}${escapeHtml(dish || "")}</span>
+            <span class="meal-sub">${[`für ${entry.servings}`, r ? kcalText(r) + (kcalText(r) ? "/Portion" : "") : (dishOk(entry) ? `≈ ${Math.round(entry.nutrition.kcal)} kcal/Portion` : ""), entry.note].filter(Boolean).map(escapeHtml).join(" · ")}</span></span>`;
+      };
       html += `<li><button class="meal-day${d === t ? " is-today" : ""}${d < t ? " is-past" : ""}" data-meal-day="${d}">
         <span class="meal-date"><b>${WD[i]}</b><small>${parse(d).getDate()}.${parse(d).getMonth() + 1}.</small></span>
         <span class="meal-main">
-          ${dish ? `<span class="meal-dish">${r && r.is_favorite ? "⭐ " : ""}${escapeHtml(dish)}</span>
-            <span class="meal-sub">${[r ? `für ${entry.servings}` : "", r ? kcalText(r) + (kcalText(r) ? "/Portion" : "") : (dishOk(entry) ? `≈ ${Math.round(entry.nutrition.kcal)} kcal/Portion` : ""), entry.note].filter(Boolean).map(escapeHtml).join(" · ")}</span>`
-          : `<span class="meal-empty">+ Abendessen planen</span>`}
+          ${list.length ? list.map(one).join("") : `<span class="meal-empty">+ Abendessen planen</span>`}
         </span>
       </button></li>`;
     }
@@ -340,20 +353,40 @@
       `<span class="muted small">${ml.recipes.length ? "Kein Rezept gefunden – einfach unten eintragen." : "Noch keine Rezepte – trag das Gericht einfach unten ein."}</span>`;
   }
 
-  function openDay(day) {
+  function renderEntries() {
+    const list = entriesOn(ml.editDay);
+    $("#meal-entries").innerHTML = (list.length ? list.map((x, i) => `<button type="button" class="chip${ml.editEntryId === x.id ? " active" : ""}" data-meal-entry="${x.id}">
+        ${eatersOf(x).length ? eatersOf(x).map(id => escapeHtml(initials(id))).join("·") + ": " : ""}${escapeHtml(dishOf(x) || "Gericht " + (i + 1))}</button>`).join("") : "") +
+      `<button type="button" class="chip${ml.editEntryId ? "" : " active"}" data-meal-entry="">+ ${list.length ? "weiteres Gericht" : "Gericht"}</button>`;
+    $("#meal-entries").hidden = !list.length;
+  }
+
+  function renderEaters() {
+    const sel = new Set(ml.eaters);
+    $("#meal-eaters").innerHTML = (state.members || []).map(m =>
+      `<button type="button" class="chip${sel.has(m.id) ? " active" : ""}" data-meal-eater="${m.id}">${escapeHtml(m.name || "?")}</button>`).join("");
+  }
+
+  function openDay(day, entryId) {
     ml.editDay = day;
-    const entry = ml.plan.find(x => x.day === day);
+    const list = entriesOn(day);
+    // vorhandenes Gericht: das eigene (oder das erste); „“ = neues Gericht
+    const entry = entryId === "" ? null : (entryId ? list.find(x => x.id === entryId) : (list.find(forMe) || list[0])) || null;
+    ml.editEntryId = entry ? entry.id : null;
+    ml.eaters = entry ? [...eatersOf(entry)] : [];
     ml.pickRecipe = entry ? entry.recipe_id : null;
     const f = $("#form-meal");
     f.reset();
     $("#meal-search").value = "";
     f.title.value = entry && !entry.recipe_id ? entry.title : "";
-    f.servings.value = entry ? entry.servings : (storageGet("pp_meal_servings") || 4);
+    f.servings.value = entry ? entry.servings : (list.length ? 1 : (storageGet("pp_meal_servings") || 4));
     f.note.value = entry ? entry.note : "";
     f.components.value = entry && !entry.recipe_id ? entry.components || "" : "";
     const d = parse(day);
     $("#meal-sheet-title").textContent = `🍽️ ${WD_LONG[(d.getDay() + 6) % 7]}, ${d.getDate()}.${d.getMonth() + 1}.`;
     $("#btn-meal-remove").hidden = !entry;
+    renderEntries();
+    renderEaters();
     renderPicker();
     renderMealNutri();
     openSheet("sheet-meal");
@@ -366,10 +399,19 @@
     if (b.dataset.pickRecipe) {
       ml.pickRecipe = ml.pickRecipe === b.dataset.pickRecipe ? null : b.dataset.pickRecipe;
       const r = ml.recipes.find(x => x.id === ml.pickRecipe);
-      if (r && !ml.plan.find(x => x.day === ml.editDay)) $("#form-meal").servings.value = storageGet("pp_meal_servings") || r.servings;
+      if (r && !ml.editEntryId && !ml.eaters.length && !entriesOn(ml.editDay).length) $("#form-meal").servings.value = storageGet("pp_meal_servings") || r.servings;
       if (ml.pickRecipe) $("#form-meal").title.value = "";
       renderPicker();
       renderMealNutri();
+    }
+    if (b.dataset.mealEntry !== undefined) { openDay(ml.editDay, b.dataset.mealEntry); return; }
+    if (b.dataset.mealEater) {
+      const id = b.dataset.mealEater;
+      ml.eaters = ml.eaters.includes(id) ? ml.eaters.filter(x => x !== id) : [...ml.eaters, id];
+      // Personenzahl folgt der Auswahl (für Gäste danach mit + erhöhen)
+      if (ml.eaters.length) $("#form-meal").servings.value = ml.eaters.length;
+      renderEaters();
+      return;
     }
     if (b.dataset.step) {
       const f = $("#form-meal");
@@ -385,17 +427,23 @@
       const title = f.title.value.trim();
       if (!ml.pickRecipe && !title) throw new Error("Bitte ein Rezept wählen oder ein Gericht eintragen.");
       const row = {
-        household_id: hid(), day: ml.editDay,
+        household_id: hid(), day: ml.editDay, eaters: ml.eaters,
         recipe_id: ml.pickRecipe, title: ml.pickRecipe ? "" : title.slice(0, 120),
         servings: Math.max(1, Math.min(50, +f.servings.value || 4)), note: f.note.value.trim().slice(0, 500),
         components: ml.pickRecipe ? "" : f.components.value.split("\n").map(l => l.trim()).filter(Boolean).join("\n").slice(0, 2000)
       };
-      storageSet("pp_meal_servings", String(row.servings));
-      let { error } = await sb.from("meal_plan").upsert(row, { onConflict: "household_id,day" });
+      if (!ml.eaters.length) storageSet("pp_meal_servings", String(row.servings));
+      const save = r => ml.editEntryId
+        ? sb.from("meal_plan").update(r).eq("id", ml.editEntryId).select("id").single()
+        : sb.from("meal_plan").insert({ ...r, sort: entriesOn(ml.editDay).length }).select("id").single();
+      let { data: savedRow, error } = await save(row);
+      if (error && /eaters|sort|created_at|duplicate key|unique/i.test(error.message || "")) {
+        throw new Error("Für mehrere Gerichte und „Wer isst mit?“ bitte zuerst das SQL aus Schritt 40 in Supabase ausführen.");
+      }
       if (error && /components/.test(error.message || "")) {
         // Schritt 39 fehlt noch – ohne Bestandteile speichern
         delete row.components;
-        ({ error } = await sb.from("meal_plan").upsert(row, { onConflict: "household_id,day" }));
+        ({ data: savedRow, error } = await save(row));
         if (!error) toast("Gespeichert – für Bestandteile und Nährwerte bitte das SQL aus Schritt 39 ausführen.", true);
       }
       if (error) throw new Error(sqlHint(error));
@@ -403,7 +451,7 @@
       await loadWeek();
       render();
       // Nährwerte für das freie Gericht schätzen (im Hintergrund)
-      const saved = ml.plan.find(x => x.day === row.day);
+      const saved = ml.plan.find(x => x.id === (savedRow && savedRow.id));
       if (saved && !saved.recipe_id && saved.title && "components" in row && !dishOk(saved) && !/^(reste|essen gehen|auswärts|pizza bestellen|bestellen|lieferdienst)$/i.test(saved.title)) {
         calcDish(saved).then(() => render()).catch(err => toast(`Nährwerte: ${err.message}`, true));
       }
@@ -411,9 +459,10 @@
   });
 
   $("#btn-meal-remove").addEventListener("click", async () => {
-    const { error } = await sb.from("meal_plan").delete().eq("household_id", hid()).eq("day", ml.editDay);
+    if (!ml.editEntryId) return;
+    const { error } = await sb.from("meal_plan").delete().eq("id", ml.editEntryId);
     if (error) { toast(translateError(error), true); return; }
-    ml.plan = ml.plan.filter(x => x.day !== ml.editDay);
+    ml.plan = ml.plan.filter(x => x.id !== ml.editEntryId);
     closeSheets();
     render();
   });
@@ -433,8 +482,10 @@
         throw new Error(msg);
       }
       const day = ml.editDay;
+      const linkId = ml.editEntryId;
       closeSheets();
       openRecipe(null);
+      ml.linkEntryId = linkId;
       const r = $("#form-recipe");
       r.name.value = data.name || name;
       r.servings.value = data.servings || servings;
@@ -461,6 +512,7 @@
   // Rezepte
   // =========================================================
   function openRecipe(id) {
+    ml.linkEntryId = null;
     const r = id ? ml.recipes.find(x => x.id === id) : null;
     ml.editRecipe = r;
     const f = $("#form-recipe");
@@ -516,9 +568,22 @@
       }
       // Direkt einplanen?
       if (f.plan_day.value) {
-        const { error } = await sb.from("meal_plan").upsert({ household_id: hid(), day: f.plan_day.value, recipe_id: id, title: "", servings: row.servings, note: "" }, { onConflict: "household_id,day" });
-        if (error) throw error;
+        const link = ml.linkEntryId && ml.plan.find(x => x.id === ml.linkEntryId && x.day === f.plan_day.value);
+        let res;
+        if (link) {
+          res = await sb.from("meal_plan").update({ recipe_id: id, title: "", components: "" }).eq("id", link.id);
+          if (res.error && /components/.test(res.error.message || "")) res = await sb.from("meal_plan").update({ recipe_id: id, title: "" }).eq("id", link.id);
+        } else {
+          // ein Gericht „für alle“ an dem Tag ersetzen, sonst neu dazu
+          const { data: ex } = await sb.from("meal_plan").select("id, eaters").eq("household_id", hid()).eq("day", f.plan_day.value);
+          const all = (ex || []).find(x => !x.eaters || !x.eaters.length);
+          res = all
+            ? await sb.from("meal_plan").update({ recipe_id: id, title: "", servings: row.servings }).eq("id", all.id)
+            : await sb.from("meal_plan").insert({ household_id: hid(), day: f.plan_day.value, recipe_id: id, title: "", servings: row.servings, note: "", sort: (ex || []).length });
+        }
+        if (res.error) throw res.error;
       }
+      ml.linkEntryId = null;
       closeSheets();
       toast(f.plan_day.value ? "Gespeichert und eingeplant." : "Rezept gespeichert.");
       await Promise.all([loadRecipes(), loadWeek()]);
@@ -643,7 +708,8 @@
   // =========================================================
   async function refreshTile() {
     if (!state.household) return;
-    const { data, error } = await sb.from("meal_plan").select("title, recipe_id, recipes(name)").eq("household_id", hid()).eq("day", today()).maybeSingle();
+    const { data: rows, error } = await sb.from("meal_plan").select("*, recipes(name)").eq("household_id", hid()).eq("day", today());
+    const data = (rows || []).find(forMe);
     $("#tile-meal-status").textContent = error || !data ? "Was gibt's heute?" : "Heute: " + ((data.recipes && data.recipes.name) || data.title || "geplant");
   }
 

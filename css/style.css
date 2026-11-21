@@ -1748,3 +1748,12 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .nutri-small { padding: 10px 12px; }
 .nutri-small p { margin: 4px 0 0; }
 #meal-free { display: grid; gap: 8px; }
+
+/* Essensplan: mehrere Gerichte, „Wer isst mit?“ */
+.meal-entries { margin: 0 0 10px; }
+.meal-one { display: flex; flex-direction: column; }
+.meal-one + .meal-one { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.meal-one.not-mine { opacity: .65; }
+.meal-who { display: inline-flex; gap: 2px; margin-right: 6px; vertical-align: 1px; }
+.meal-who i { font-style: normal; font-size: .68rem; font-weight: 700; padding: 1px 5px; border-radius: 99px; background: var(--meal-soft); color: var(--meal); border: 1px solid var(--meal); }
+#meal-eaters { margin-top: 4px; }
