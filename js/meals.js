@@ -208,6 +208,40 @@
               : `<button type="button" class="link small" id="btn-nutri">neu berechnen</button>`}`;
   }
 
+  // ---------- Freie Gerichte (ohne Rezept): KI schätzt eine übliche Portion ----------
+  const dishKey = e => `${String(e.title || "").trim().toLowerCase()}|${String(e.components || "").split("\n").map(l => l.trim().toLowerCase()).filter(Boolean).join("\n")}`;
+  const dishOk = e => e && !e.recipe_id && e.nutrition && e.nutrition.kcal != null && e.nutrition_for === dishKey(e);
+
+  async function calcDish(entry) {
+    const { data, error } = await sb.functions.invoke("assist", { body: { action: "nutrition", dish: true, name: entry.title, components: entry.components || "" } });
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+      throw new Error(msg);
+    }
+    const key = dishKey(entry);
+    const { error: e2 } = await sb.from("meal_plan").update({ nutrition: data, nutrition_for: key }).eq("household_id", hid()).eq("day", entry.day);
+    if (e2) throw new Error(/nutrition|components/.test(e2.message || "") ? "Bitte zuerst das SQL aus Schritt 39 in Supabase ausführen." : translateError(e2));
+    const cur = ml.plan.find(x => x.day === entry.day);
+    if (cur) { cur.nutrition = data; cur.nutrition_for = key; }
+    return data;
+  }
+
+  function renderMealNutri() {
+    const box = $("#meal-nutri");
+    const entry = ml.plan.find(x => x.day === ml.editDay);
+    const f = $("#form-meal");
+    $("#meal-free").hidden = !!ml.pickRecipe;
+    $("#btn-meal-to-recipe").hidden = !!ml.pickRecipe || !f.title.value.trim();
+    if (!entry || entry.recipe_id || !entry.nutrition || entry.nutrition.kcal == null || ml.pickRecipe) { box.hidden = true; return; }
+    const n = entry.nutrition, stale = !dishOk(entry) || f.title.value.trim().toLowerCase() !== String(entry.title || "").trim().toLowerCase();
+    box.hidden = false;
+    box.innerHTML = `<div class="nutri-head"><strong>≈ ${Math.round(n.kcal)} kcal pro Portion</strong><span class="muted small">grobe KI-Schätzung</span></div>
+      <p class="small">Eiweiß ${fmtG(n.protein)} · Kohlenhydrate ${fmtG(n.carbs)} · Fett ${fmtG(n.fat)} · Salz ${fmtG(n.salt)}</p>
+      ${n.portion ? `<p class="muted small">Angenommen: ${escapeHtml(n.portion)}</p>` : ""}
+      ${stale ? `<p class="small nutri-stale">Gericht geändert – wird beim Speichern neu geschätzt.</p>` : ""}`;
+  }
+
   async function nutriFor(r, quiet) {
     renderNutrition();
     try {
@@ -261,7 +295,7 @@
         <span class="meal-date"><b>${WD[i]}</b><small>${parse(d).getDate()}.${parse(d).getMonth() + 1}.</small></span>
         <span class="meal-main">
           ${dish ? `<span class="meal-dish">${r && r.is_favorite ? "⭐ " : ""}${escapeHtml(dish)}</span>
-            <span class="meal-sub">${[r ? `für ${entry.servings}` : "", r ? kcalText(r) + (kcalText(r) ? "/Portion" : "") : "", entry.note].filter(Boolean).map(escapeHtml).join(" · ")}</span>`
+            <span class="meal-sub">${[r ? `für ${entry.servings}` : "", r ? kcalText(r) + (kcalText(r) ? "/Portion" : "") : (dishOk(entry) ? `≈ ${Math.round(entry.nutrition.kcal)} kcal/Portion` : ""), entry.note].filter(Boolean).map(escapeHtml).join(" · ")}</span>`
           : `<span class="meal-empty">+ Abendessen planen</span>`}
         </span>
       </button></li>`;
@@ -316,10 +350,12 @@
     f.title.value = entry && !entry.recipe_id ? entry.title : "";
     f.servings.value = entry ? entry.servings : (storageGet("pp_meal_servings") || 4);
     f.note.value = entry ? entry.note : "";
+    f.components.value = entry && !entry.recipe_id ? entry.components || "" : "";
     const d = parse(day);
     $("#meal-sheet-title").textContent = `🍽️ ${WD_LONG[(d.getDay() + 6) % 7]}, ${d.getDate()}.${d.getMonth() + 1}.`;
     $("#btn-meal-remove").hidden = !entry;
     renderPicker();
+    renderMealNutri();
     openSheet("sheet-meal");
   }
 
@@ -333,13 +369,14 @@
       if (r && !ml.plan.find(x => x.day === ml.editDay)) $("#form-meal").servings.value = storageGet("pp_meal_servings") || r.servings;
       if (ml.pickRecipe) $("#form-meal").title.value = "";
       renderPicker();
+      renderMealNutri();
     }
     if (b.dataset.step) {
       const f = $("#form-meal");
       f.servings.value = Math.max(1, Math.min(50, (+f.servings.value || 4) + +b.dataset.step));
     }
   });
-  $("#form-meal").title.addEventListener("input", e => { if (e.target.value.trim() && ml.pickRecipe) { ml.pickRecipe = null; renderPicker(); } });
+  $("#form-meal").title.addEventListener("input", e => { if (e.target.value.trim() && ml.pickRecipe) { ml.pickRecipe = null; renderPicker(); } renderMealNutri(); });
 
   $("#form-meal").addEventListener("submit", e => {
     e.preventDefault();
@@ -350,14 +387,26 @@
       const row = {
         household_id: hid(), day: ml.editDay,
         recipe_id: ml.pickRecipe, title: ml.pickRecipe ? "" : title.slice(0, 120),
-        servings: Math.max(1, Math.min(50, +f.servings.value || 4)), note: f.note.value.trim().slice(0, 500)
+        servings: Math.max(1, Math.min(50, +f.servings.value || 4)), note: f.note.value.trim().slice(0, 500),
+        components: ml.pickRecipe ? "" : f.components.value.split("\n").map(l => l.trim()).filter(Boolean).join("\n").slice(0, 2000)
       };
       storageSet("pp_meal_servings", String(row.servings));
-      const { error } = await sb.from("meal_plan").upsert(row, { onConflict: "household_id,day" });
+      let { error } = await sb.from("meal_plan").upsert(row, { onConflict: "household_id,day" });
+      if (error && /components/.test(error.message || "")) {
+        // Schritt 39 fehlt noch – ohne Bestandteile speichern
+        delete row.components;
+        ({ error } = await sb.from("meal_plan").upsert(row, { onConflict: "household_id,day" }));
+        if (!error) toast("Gespeichert – für Bestandteile und Nährwerte bitte das SQL aus Schritt 39 ausführen.", true);
+      }
       if (error) throw new Error(sqlHint(error));
       closeSheets();
       await loadWeek();
       render();
+      // Nährwerte für das freie Gericht schätzen (im Hintergrund)
+      const saved = ml.plan.find(x => x.day === row.day);
+      if (saved && !saved.recipe_id && saved.title && "components" in row && !dishOk(saved) && !/^(reste|essen gehen|auswärts|pizza bestellen|bestellen|lieferdienst)$/i.test(saved.title)) {
+        calcDish(saved).then(() => render()).catch(err => toast(`Nährwerte: ${err.message}`, true));
+      }
     });
   });
 
@@ -368,6 +417,41 @@
     closeSheets();
     render();
   });
+  $("#btn-meal-to-recipe").addEventListener("click", async () => {
+    const f = $("#form-meal");
+    const name = f.title.value.trim();
+    if (!name) { toast("Erst das Gericht eintragen.", true); return; }
+    const btn = $("#btn-meal-to-recipe");
+    btn.disabled = true;
+    btn.textContent = "✨ KI schreibt das Rezept …";
+    try {
+      const servings = Math.max(1, Math.min(50, +f.servings.value || 4));
+      const { data, error } = await sb.functions.invoke("assist", { body: { action: "draft", name, components: f.components.value, servings } });
+      if (error) {
+        let msg = error.message;
+        try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+        throw new Error(msg);
+      }
+      const day = ml.editDay;
+      closeSheets();
+      openRecipe(null);
+      const r = $("#form-recipe");
+      r.name.value = data.name || name;
+      r.servings.value = data.servings || servings;
+      r.ingredients.value = (data.ingredients || []).join("\n");
+      r.instructions.value = data.instructions || "";
+      r.plan_day.value = day;
+      $("#recipe-sheet-title").textContent = "Neues Rezept (Vorschlag)";
+      previewIngredients();
+      toast("Vorschlag der KI – bitte Mengen prüfen und speichern. Der Tag wird dann mit dem Rezept verknüpft.");
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "📖 Als Rezept anlegen";
+    }
+  });
+
   $("#btn-meal-show-recipe").addEventListener("click", () => {
     if (ml.pickRecipe) { closeSheets(); openRecipe(ml.pickRecipe); }
     else toast("Erst ein Rezept auswählen.");

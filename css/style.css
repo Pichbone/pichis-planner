@@ -1744,3 +1744,7 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .td-row.alert .td-main { color: var(--orange, #C2410C); }
 .td-go { color: var(--muted); font-size: 1.2rem; }
 .td-empty { margin: 4px 2px 8px; }
+
+.nutri-small { padding: 10px 12px; }
+.nutri-small p { margin: 4px 0 0; }
+#meal-free { display: grid; gap: 8px; }

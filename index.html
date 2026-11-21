@@ -929,8 +929,14 @@
         <div class="chip-wrap meal-pick" id="meal-pick"></div>
       </div>
       <label>Oder etwas anderes
-        <input type="text" name="title" maxlength="120" placeholder="z. B. Pizza bestellen, Reste, Essen gehen">
+        <input type="text" name="title" maxlength="120" placeholder="z. B. Frikadellen mit Ofenkartoffeln, Pizza bestellen">
       </label>
+      <div id="meal-free">
+        <label>Bestandteile <span class="hint">(optional · eine pro Zeile, Menge darf dabeistehen)</span>
+          <textarea name="components" rows="3" maxlength="2000" placeholder="2 Frikadellen&#10;250 g Ofenkartoffeln&#10;Gurkensalat"></textarea>
+        </label>
+        <div class="nutri nutri-small" id="meal-nutri" hidden></div>
+      </div>
       <div class="meal-servings">
         <span class="field-label">Personen</span>
         <div class="stepper">
@@ -946,6 +952,7 @@
     </form>
     <div class="note-actions">
       <button type="button" class="link" id="btn-meal-show-recipe">📖 Rezept ansehen</button>
+      <button type="button" class="link" id="btn-meal-to-recipe" hidden>📖 Als Rezept anlegen</button>
       <button type="button" class="link danger-link" id="btn-meal-remove" hidden>Entfernen</button>
     </div>
   </div>
