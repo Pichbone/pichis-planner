@@ -150,6 +150,8 @@
         <button class="icon-btn small" id="btn-dismiss-install" aria-label="Hinweis schließen">✕</button>
       </div>
 
+      <section class="card today-box" id="today-box" hidden aria-label="Heute"></section>
+
       <h2 class="section-title">Bereiche</h2>
       <p class="muted small" id="tiles-empty" hidden>Alle Kacheln sind ausgeblendet – über das Personen-Symbol → „Startseite“ kannst du sie wieder einblenden.</p>
       <div class="tiles">
@@ -1949,6 +1951,7 @@
     <div class="panel-section">
       <h3>Startseite</h3>
       <p class="muted small">Kacheln ein- und ausblenden, mit ↑ ↓ sortieren und mit ↔︎ breit anzeigen. Gilt nur für dich – auf all deinen Geräten.</p>
+      <label class="switch"><input type="checkbox" id="today-toggle" checked><span>„Heute“ über den Kacheln anzeigen</span></label>
       <ul class="ts-list" id="tiles-settings"></ul>
       <button type="button" class="link" id="btn-tiles-reset">Zurücksetzen</button>
     </div>
@@ -2027,5 +2030,6 @@
   <script src="/js/football.js"></script>
   <script src="/js/fuel.js"></script>
   <script src="/js/trips.js"></script>
+  <script src="/js/today.js"></script>
 </body>
 </html>

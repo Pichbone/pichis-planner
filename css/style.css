@@ -1730,3 +1730,17 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .ws-map select { max-width: 55%; }
 
 .ws-fixkind { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 4px; font-weight: 600; }
+
+/* „Heute“ oben auf der Startseite */
+.today-box { padding: 10px 12px 6px; margin-bottom: 14px; }
+.td-head { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 2px 4px; }
+.td-list { list-style: none; margin: 0; padding: 0; }
+.td-list li + li { border-top: 1px solid var(--line); }
+.td-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; color: inherit; text-decoration: none; }
+.td-icon { font-size: 1.15rem; width: 26px; text-align: center; flex-shrink: 0; }
+.td-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.td-main { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-sub { font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-row.alert .td-main { color: var(--orange, #C2410C); }
+.td-go { color: var(--muted); font-size: 1.2rem; }
+.td-empty { margin: 4px 2px 8px; }
