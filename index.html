@@ -150,6 +150,10 @@
         <button class="icon-btn small" id="btn-dismiss-install" aria-label="Hinweis schließen">✕</button>
       </div>
 
+      <form id="home-search" class="home-search" role="search" autocomplete="off">
+        <input type="search" name="q" placeholder="🔎 Alles durchsuchen" aria-label="Alles durchsuchen" enterkeyhint="search">
+      </form>
+
       <section class="card today-box" id="today-box" hidden aria-label="Heute"></section>
 
       <h2 class="section-title">Bereiche</h2>
@@ -513,9 +517,18 @@
       <div id="hl-body"></div>
      </div>
 
+     <!-- ===== Suche ===== -->
+     <div id="view-search" class="view" hidden>
+      <div class="note-toolbar">
+        <input type="search" id="se-input" placeholder="Wonach suchst du?" aria-label="Alles durchsuchen" autocomplete="off" enterkeyhint="search">
+      </div>
+      <div id="se-results"></div>
+     </div>
+
      <!-- ===== Dokumentenarchiv ===== -->
      <div id="view-archive" class="view" hidden>
       <div id="ar-status"></div>
+      <div id="ar-dl-bar" hidden></div>
       <div class="btn-row ar-actions" id="ar-actions" hidden></div>
       <div class="note-toolbar">
         <input type="search" id="ar-search" placeholder="Dokumente durchsuchen – auch im Text" aria-label="Archiv durchsuchen" autocomplete="off">
@@ -1241,6 +1254,7 @@
         <button type="button" class="btn btn-small" id="btn-ar-recipe" hidden>🍽️ In den Essensplan übernehmen</button>
       </div>
     </div>
+    <div id="ar-deadlines" class="ar-deadlines" hidden></div>
     <form id="form-ar" class="form" autocomplete="off">
       <label id="ar-title-row">Titel
         <input type="text" name="title" maxlength="200" placeholder="z. B. Kfz-Versicherung HUK 2026">
@@ -1274,6 +1288,15 @@
       <span></span>
       <button type="button" class="link danger-link" id="btn-ar-delete">Löschen</button>
     </div>
+  </div>
+
+  <div id="sheet-ar-deadlines" class="sheet sheet-tall" hidden role="dialog" aria-label="Fristen und Garantien">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>⏰ Fristen & Garantien</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="ar-dl-body"></div>
   </div>
 
   <!-- ICS-Import -->
@@ -2119,6 +2142,7 @@
   <script src="/js/books.js"></script>
   <script src="/js/fitness.js"></script>
   <script src="/js/health.js"></script>
+  <script src="/js/search.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>

@@ -155,6 +155,14 @@
     // Welche Rezept-Dokumente sind schon im Essensplan? (Schritt 35)
     const r = await sb.from("recipes").select("id, archive_doc_id").eq("household_id", hid()).not("archive_doc_id", "is", null);
     ar.recipeLinks = new Map(r.error ? [] : r.data.map(x => [x.archive_doc_id, x.id]));
+    // Fristen (Schritt 45) – fehlt die Tabelle noch, bleibt der Bereich einfach aus
+    const dl = await sb.from("archive_deadlines").select("*").eq("household_id", hid()).order("due_date");
+    ar.deadlines = dl.error ? null : dl.data;
+    if (ar.deadlines) {
+      const ck = await sb.from("archive_docs").select("id").eq("household_id", hid()).eq("deadlines_checked", true);
+      const set = new Set(ck.error ? [] : ck.data.map(x => x.id));
+      for (const d of ar.docs) d.deadlines_checked = set.has(d.id);
+    }
   }
 
   function subscribe() {
@@ -226,6 +234,7 @@
   function render() {
     if (!ar.active) return;
     renderStatus();
+    renderDeadlineBar();
     const cats = [...new Set(ar.docs.map(d => d.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
     if (ar.filter && !cats.includes(ar.filter)) ar.filter = "";
     $("#ar-chips").innerHTML = cats.length
@@ -525,6 +534,11 @@
     for (const id of s.tag_ids || []) ar.draftTags.add(id);
     renderCats();
     renderTagPicker();
+    // Fristen-Vorschläge (nur neue, die es so noch nicht gibt)
+    const have = ar.editing ? docDeadlines(ar.editing.id) : [];
+    ar.sugDeadlines = (s.deadlines || []).filter(x => !have.some(h => h.due_date === x.due_date && h.kind === x.kind))
+      .map(x => ({ ...x, on: true }));
+    renderDocDeadlines();
   }
 
   async function readPending(file) {
@@ -600,6 +614,9 @@
     $("#form-ar").is_private.disabled = false;
     renderPending();
     renderTagPicker();
+    ar.sugDeadlines = [];
+    ar.dlEdit = null;
+    renderDocDeadlines();
     openSheet("sheet-archive");
     autoSuggest();
   }
@@ -636,6 +653,9 @@
     $("#btn-ar-save").textContent = "Speichern";
     $("#btn-ar-delete").hidden = false;
     renderTagPicker();
+    ar.sugDeadlines = [];
+    ar.dlEdit = null;
+    renderDocDeadlines();
     openSheet("sheet-archive");
   }
 
@@ -766,6 +786,7 @@
         }
         const { error } = await sb.from("archive_docs").update({ ...meta, title: title.slice(0, 200) }).eq("id", ar.editing.id);
         if (error) throw error;
+        await saveSuggested(ar.editing.id);
         closeSheets();
         toast("Gespeichert.");
         await loadAll(); render();
@@ -792,15 +813,16 @@
           const title = (ar.pending.length === 1 && f.title.value.trim()) || parts.title;
           const date = meta.doc_date || parts.date;
           const up = await uploadFile(file, meta.category, nameFor(title, date, meta.category, file.name));
-          const { error } = await sb.from("archive_docs").insert({
+          const { data: newDoc, error } = await sb.from("archive_docs").insert({
             household_id: hid(), ...meta, doc_date: date, is_private: !!meta.is_private,
             title: title.slice(0, 200), file_name: (up.name || file.name).slice(0, 255), file_path: up.path,
             size: file.size, mime: file.type || (isPdf ? "application/pdf" : ""), pages, text_content: text
-          });
+          }).select("id").single();
           if (error) {
             if (/archive_docs/.test(error.message || "")) throw new Error("Bitte zuerst das SQL aus Schritt 30 in Supabase ausführen.");
             throw error;
           }
+          if (ar.pending.length === 1 && newDoc) await saveSuggested(newDoc.id);
           done++;
         }
       } finally {
@@ -1142,6 +1164,11 @@
         if (error && text) ({ data: row, error } = await sb.from("archive_docs").insert({ ...rec, text_content: "" }).select("id, title, doc_date, file_name").single());
         if (error) { console.warn(file.name, error); failed.push(file.name); if (!failMsg) failMsg = translateError(error); continue; }
         done++;
+        if (sug) {
+          const dls = (sug.deadlines || []).map(x => dlRow(row.id, x));
+          if (dls.length && ar.deadlines) await sb.from("archive_deadlines").insert(dls);
+          sb.from("archive_docs").update({ deadlines_checked: true }).eq("id", row.id).then(() => {});
+        }
         const wrongFolder = category !== (file.folder || "");
         const wrongName = f.rename.checked && !sameName(row.file_name, nameFor(row.title, row.doc_date, category, row.file_name));
         if (wrongFolder || wrongName) {
@@ -1158,6 +1185,216 @@
       ? `${done} übernommen, ${failed.length} fehlgeschlagen: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " …" : ""}${failMsg ? ` – Grund: ${failMsg}` : ""}`
       : `${done} Dokument${done === 1 ? "" : "e"} übernommen.${aiFail ? ` KI-Vorschläge teilweise nicht möglich: ${aiFail}` : ""}`, !!failed.length || !!aiFail);
   });
+
+
+  // =========================================================
+  // Fristen & Garantien (Schritt 45)
+  // =========================================================
+  const DL_KINDS = { kuendigung: ["📝", "Kündigen bis"], vertragsende: ["📄", "Vertrag endet"], garantie: ["🛡️", "Garantie endet"], ablauf: ["🪪", "Läuft ab"], frist: ["⏰", "Frist"] };
+  const DL_HINT = /kündig|laufzeit|vertrag|garantie|gewährleist|frist|gültig bis|gültig vom|ablauf|läuft ab|verlänger|widerspruch|einspruch|police|versicherungs|abonnement|abo\b|mindestlaufzeit/i;
+  const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const daysTo = iso => Math.round((new Date(iso + "T12:00:00") - new Date(todayIso() + "T12:00:00")) / 864e5);
+  const inDays = n => n < 0 ? `vor ${-n} Tag${n === -1 ? "" : "en"}` : n === 0 ? "heute" : n === 1 ? "morgen" : `in ${n} Tagen`;
+  const docDeadlines = id => (ar.deadlines || []).filter(x => x.doc_id === id).sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const dlRow = (docId, x) => ({ household_id: hid(), doc_id: docId, kind: x.kind, title: String(x.title).slice(0, 160), due_date: x.due_date,
+    renew_months: x.renew_months || 0, note: String(x.note || "").slice(0, 500), remind_days: x.kind === "garantie" || x.kind === "ablauf" ? 60 : 30 });
+
+  async function saveSuggested(docId) {
+    const list = (ar.sugDeadlines || []).filter(x => x.on);
+    ar.sugDeadlines = [];
+    if (!list.length || !ar.deadlines) return;
+    const { error } = await sb.from("archive_deadlines").insert(list.map(x => dlRow(docId, x)));
+    if (error) toast(`Fristen nicht gespeichert: ${translateError(error)}`, true);
+    else toast(`⏰ ${list.length} Frist${list.length === 1 ? "" : "en"} gespeichert – du wirst rechtzeitig erinnert.`);
+  }
+
+  function dlLine(x, withDoc) {
+    const [icon, label] = DL_KINDS[x.kind] || DL_KINDS.frist;
+    const n = daysTo(x.due_date);
+    const doc = withDoc && ar.docs.find(d => d.id === x.doc_id);
+    return `<span class="dl-icon">${icon}</span><span class="dl-main"><span class="dl-title${x.done ? " done" : ""}">${escapeHtml(x.title)}</span>
+      <span class="ar-sub">${label} ${dateText(x.due_date)}${x.done ? " · ✓ erledigt" : ` · <strong class="${n <= 7 ? "dl-soon" : ""}">${inDays(n)}</strong>`}${x.renew_months ? ` · verlängert sich um ${x.renew_months} Mon.` : ""}${x.note ? " · " + escapeHtml(x.note) : ""}${doc ? ` · 📄 ${escapeHtml(doc.title)}` : ""}</span></span>`;
+  }
+
+  function dlForm(x) {
+    const v = x || { kind: "kuendigung", title: "", due_date: "", remind_days: 30, renew_months: 0, note: "" };
+    return `<div class="dl-form" data-dl-form="${x ? x.id : "new"}">
+      <div class="form-row form-row-even">
+        <label>Art <select name="kind">${Object.entries(DL_KINDS).map(([k, [i, l]]) => `<option value="${k}"${v.kind === k ? " selected" : ""}>${i} ${l}</option>`).join("")}</select></label>
+        <label>Datum <input type="date" name="due_date" value="${escapeHtml(v.due_date || "")}"></label>
+      </div>
+      <label>Bezeichnung <input type="text" name="title" maxlength="160" value="${escapeHtml(v.title)}" placeholder="z. B. Kfz-Versicherung kündigen"></label>
+      <div class="form-row form-row-even">
+        <label>Erinnern <select name="remind_days">${[[7, "1 Woche vorher"], [14, "2 Wochen vorher"], [30, "1 Monat vorher"], [60, "2 Monate vorher"], [90, "3 Monate vorher"]].map(([d, l]) => `<option value="${d}"${+v.remind_days === d ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+        <label>Verlängert sich <select name="renew_months">${[[0, "nein"], [1, "monatlich"], [12, "um 1 Jahr"], [24, "um 2 Jahre"]].map(([m, l]) => `<option value="${m}"${+v.renew_months === m ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+      </div>
+      <label>Notiz <input type="text" name="note" maxlength="500" value="${escapeHtml(v.note || "")}" placeholder="z. B. 3 Monate zum Jahresende"></label>
+      <div class="btn-row"><button type="button" class="btn btn-primary btn-small" data-dl-save>Speichern</button><button type="button" class="link" data-dl-cancel>Abbrechen</button></div>
+    </div>`;
+  }
+
+  // Block im Dokument-Blatt
+  function renderDocDeadlines() {
+    const box = $("#ar-deadlines");
+    if (!box) return;
+    if (!ar.deadlines) { box.hidden = true; return; }
+    const d = ar.editing;
+    const list = d ? docDeadlines(d.id) : [];
+    const sug = ar.sugDeadlines || [];
+    box.hidden = !d && !sug.length;
+    box.innerHTML = `<h3 class="sheet-sub">⏰ Fristen & Garantien</h3>
+      ${list.map(x => ar.dlEdit === x.id ? dlForm(x) : `<div class="dl-row">${dlLine(x)}
+        <button type="button" class="icon-btn small" data-dl-done="${x.id}" title="${x.done ? "Wieder offen" : "Erledigt"}" aria-label="Erledigt">${x.done ? "↺" : "✓"}</button>
+        <button type="button" class="icon-btn small" data-dl-edit="${x.id}" aria-label="Bearbeiten">✏️</button>
+        <button type="button" class="icon-btn small" data-dl-del="${x.id}" aria-label="Löschen">✕</button></div>`).join("")}
+      ${sug.length ? `<p class="muted small">✨ Die KI hat ${sug.length === 1 ? "eine Frist" : "diese Fristen"} gefunden – wird beim Speichern übernommen:</p>
+        ${sug.map((x, i) => `<label class="dl-row dl-sug"><input type="checkbox" data-dl-sug="${i}"${x.on ? " checked" : ""}>${dlLine(x)}</label>`).join("")}` : ""}
+      ${d ? (ar.dlEdit === "new" ? dlForm(null) : `<button type="button" class="link small" data-dl-add>+ Frist hinzufügen</button>`) : ""}`;
+  }
+
+  $("#ar-deadlines").addEventListener("change", e => {
+    const c = e.target.closest("[data-dl-sug]");
+    if (c) ar.sugDeadlines[+c.dataset.dlSug].on = c.checked;
+  });
+  $("#ar-deadlines").addEventListener("click", async e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.hasAttribute("data-dl-add")) { ar.dlEdit = "new"; renderDocDeadlines(); return; }
+    if (b.hasAttribute("data-dl-cancel")) { ar.dlEdit = null; renderDocDeadlines(); return; }
+    if (b.dataset.dlEdit) { ar.dlEdit = b.dataset.dlEdit; renderDocDeadlines(); return; }
+    if (b.dataset.dlDel) {
+      if (!confirm("Diese Frist löschen?")) return;
+      const { error } = await sb.from("archive_deadlines").delete().eq("id", b.dataset.dlDel);
+      if (error) { toast(translateError(error), true); return; }
+      ar.deadlines = ar.deadlines.filter(x => x.id !== b.dataset.dlDel);
+      renderDocDeadlines(); renderDeadlineBar(); return;
+    }
+    if (b.dataset.dlDone) { await toggleDone(b.dataset.dlDone); renderDocDeadlines(); return; }
+    if (b.hasAttribute("data-dl-save")) {
+      const f = b.closest(".dl-form");
+      const v = n => f.querySelector(`[name=${n}]`).value;
+      const row = { kind: v("kind"), title: v("title").trim().slice(0, 160), due_date: v("due_date"), remind_days: +v("remind_days"), renew_months: +v("renew_months"), note: v("note").trim().slice(0, 500) };
+      if (!row.title) { toast("Bitte eine Bezeichnung eingeben.", true); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.due_date)) { toast("Bitte ein Datum wählen.", true); return; }
+      const id = f.dataset.dlForm;
+      const q = id === "new" ? sb.from("archive_deadlines").insert({ ...row, household_id: hid(), doc_id: ar.editing.id }) : sb.from("archive_deadlines").update(row).eq("id", id);
+      const { data, error } = await q.select().single();
+      if (error) { toast(translateError(error), true); return; }
+      ar.deadlines = [...ar.deadlines.filter(x => x.id !== data.id), data];
+      ar.dlEdit = null;
+      renderDocDeadlines(); renderDeadlineBar();
+    }
+  });
+
+  async function toggleDone(id) {
+    const x = ar.deadlines.find(y => y.id === id);
+    if (!x) return;
+    const { data, error } = await sb.from("archive_deadlines").update({ done: !x.done }).eq("id", id).select().single();
+    if (error) { toast(translateError(error), true); return; }
+    Object.assign(x, data);
+    renderDeadlineBar();
+  }
+
+  // Leiste oben im Archiv
+  function renderDeadlineBar() {
+    const box = $("#ar-dl-bar");
+    if (!box) return;
+    if (!ar.deadlines || !ar.docs.length) { box.hidden = true; return; }
+    const open = ar.deadlines.filter(x => !x.done && ar.docs.some(d => d.id === x.doc_id));
+    const soon = open.filter(x => daysTo(x.due_date) <= 60);
+    box.hidden = false;
+    box.innerHTML = soon.length
+      ? `<button type="button" class="ar-recipe-bar dl-bar" id="btn-ar-dl"><span>⏰ <strong>${soon.length} Frist${soon.length === 1 ? "" : "en"}</strong> in den nächsten 60 Tagen · nächste: ${escapeHtml(soon[0].title)} (${inDays(daysTo(soon[0].due_date))})</span><span>›</span></button>`
+      : `<button type="button" class="link small dl-link" id="btn-ar-dl">⏰ Fristen & Garantien${open.length ? ` (${open.length})` : ""}</button>`;
+  }
+
+  function renderDeadlineSheet() {
+    const all = (ar.deadlines || []).filter(x => ar.docs.some(d => d.id === x.doc_id));
+    const open = all.filter(x => !x.done).sort((a, b) => a.due_date.localeCompare(b.due_date));
+    const done = all.filter(x => x.done);
+    const unchecked = ar.docs.filter(d => d.has_text && !d.deadlines_checked && !isRecipeCat(d.category)).length;
+    const item = x => `<li class="dl-row">${dlLine(x, true).replace('<span class="dl-main">', `<span class="dl-main" data-dl-open="${x.doc_id}">`)}
+        <button type="button" class="icon-btn small" data-dl-done="${x.id}" aria-label="${x.done ? "Wieder offen" : "Erledigt"}">${x.done ? "↺" : "✓"}</button></li>`;
+    $("#ar-dl-body").innerHTML = `
+      ${open.length ? `<ul class="dl-list">${open.map(item).join("")}</ul>` : `<p class="muted small">Keine offenen Fristen. Beim Ablegen mit KI-Vorschlag erkennt die App Kündigungsfristen, Vertragslaufzeiten und Garantien automatisch.</p>`}
+      ${done.length ? `<details class="tr-past"><summary>Erledigt (${done.length})</summary><ul class="dl-list">${done.map(item).join("")}</ul></details>` : ""}
+      <h3 class="sheet-sub">Im Bestand suchen</h3>
+      <p class="muted small">${unchecked ? `${unchecked} Dokument${unchecked === 1 ? "" : "e"} mit Text wurde${unchecked === 1 ? "" : "n"} noch nicht auf Fristen geprüft. Die App liest nur Dokumente, in denen Wörter wie „Kündigung“, „Laufzeit“ oder „Garantie“ vorkommen, mit der KI (kostet nur wenige Cent).` : "Alle Dokumente mit Text sind geprüft."}</p>
+      ${unchecked ? `<button type="button" class="btn btn-small" id="btn-ar-dl-scan">✨ Fristen im Bestand suchen</button>` : ""}
+      <p class="muted small" id="ar-dl-progress"></p>
+      <h3 class="sheet-sub">Erinnerung</h3>
+      <label class="switch"><input type="checkbox" id="ar-dl-push"${state.profile && state.profile.deadline_push === false ? "" : " checked"}><span>Push-Erinnerung für Fristen</span></label>
+      <p class="muted small">Zur eingestellten Vorlaufzeit und noch einmal 7 Tage vorher. Anstehende Fristen stehen außerdem in der Morgen-Mail.</p>`;
+  }
+
+  $("#ar-dl-bar").addEventListener("click", e => {
+    if (!e.target.closest("#btn-ar-dl")) return;
+    renderDeadlineSheet();
+    openSheet("sheet-ar-deadlines");
+  });
+  $("#ar-dl-body").addEventListener("click", async e => {
+    const done = e.target.closest("[data-dl-done]");
+    if (done) { await toggleDone(done.dataset.dlDone); renderDeadlineSheet(); return; }
+    const o = e.target.closest("[data-dl-open]");
+    if (o) { closeSheets(); openDoc(o.dataset.dlOpen); return; }
+    if (e.target.closest("#btn-ar-dl-scan")) scanDeadlines(e.target.closest("#btn-ar-dl-scan"));
+  });
+
+  $("#ar-dl-body").addEventListener("change", async e => {
+    if (e.target.id !== "ar-dl-push") return;
+    const v = e.target.checked;
+    const { error } = await sb.from("profiles").update({ deadline_push: v }).eq("id", me());
+    if (error) { toast(translateError(error), true); e.target.checked = !v; return; }
+    state.profile.deadline_push = v;
+    toast(v ? "Erinnerung an." : "Erinnerung aus.");
+  });
+
+  // Bestand nachträglich prüfen
+  async function scanDeadlines(btn) {
+    const todo = ar.docs.filter(d => d.has_text && !d.deadlines_checked && !isRecipeCat(d.category));
+    if (!todo.length) return;
+    btn.disabled = true;
+    const prog = $("#ar-dl-progress");
+    let found = 0, asked = 0, failed = 0, lastErr = "";
+    for (let i = 0; i < todo.length; i += 20) {
+      const batch = todo.slice(i, i + 20);
+      const { data, error } = await sb.from("archive_docs").select("id, title, doc_date, file_name, text_content").in("id", batch.map(d => d.id));
+      if (error) { lastErr = translateError(error); failed += batch.length; continue; }
+      for (const d of data) {
+        prog.textContent = `Geprüft ${i + data.indexOf(d) + 1} von ${todo.length} · ${found} Frist${found === 1 ? "" : "en"} gefunden …`;
+        let ok = true;
+        if (DL_HINT.test(d.title + " " + d.text_content)) {
+          asked++;
+          try {
+            const r = await sb.functions.invoke("assist", { body: { action: "deadlines", text: d.text_content.slice(0, 20000), title: d.title, doc_date: d.doc_date, file_name: d.file_name } });
+            if (r.error) {
+              let msg = r.error.message;
+              try { const j = await r.error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+              throw new Error(msg);
+            }
+            const have = docDeadlines(d.id);
+            const rows = (r.data.deadlines || []).filter(x => !have.some(h => h.due_date === x.due_date && h.kind === x.kind)).map(x => dlRow(d.id, x));
+            if (rows.length) {
+              const ins = await sb.from("archive_deadlines").insert(rows).select();
+              if (ins.error) throw ins.error;
+              ar.deadlines.push(...ins.data);
+              found += rows.length;
+            }
+          } catch (err) {
+            ok = false; failed++; lastErr = err.message;
+            if (/Guthaben|API-Schlüssel/.test(lastErr)) { i = todo.length; break; }
+          }
+        }
+        if (ok) {
+          await sb.from("archive_docs").update({ deadlines_checked: true }).eq("id", d.id);
+          const local = ar.docs.find(x => x.id === d.id);
+          if (local) local.deadlines_checked = true;
+        }
+      }
+    }
+    toast(`${todo.length - failed} Dokumente geprüft, ${asked} davon mit KI · ${found} Frist${found === 1 ? "" : "en"} gefunden.${failed ? ` ${failed} nicht: ${lastErr}` : ""}`, !!failed);
+    renderDeadlineSheet(); renderDeadlineBar();
+  }
 
   // ---------- Modul ----------
   PP.modules.archive = {
@@ -1176,6 +1413,14 @@
       }
       render();
       renderFooter();
+      const go = PP.takePending && PP.takePending("archive");
+      if (go) {
+        if (!ar.docs.some(x => x.id === go.id)) {
+          const { data } = await sb.from("archive_docs").select(LIST_FIELDS).eq("id", go.id).maybeSingle();
+          if (data) ar.docs.push(data);
+        }
+        openDoc(go.id);
+      }
     },
     leave() { ar.active = false; unsubscribe(); closeSheets(); },
     async resume() { if (ar.active) { try { await loadAll(); render(); } catch { /* egal */ } } },

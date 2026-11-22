@@ -289,6 +289,8 @@
         await loadBooks();
       } catch (err) { toast(sqlHint(err), true); }
       render();
+      const go = PP.takePending && PP.takePending("books");
+      if (go) openBook(go.id);
       sync(false);
     },
     leave() { bk.active = false; },

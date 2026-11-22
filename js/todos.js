@@ -912,6 +912,14 @@
         console.error(err);
         toast(translateError(err), true);
       }
+      const go = PP.takePending && PP.takePending("todos");
+      if (go) {
+        if (!td.items.some(x => x.id === go.id)) {
+          const { data } = await sb.from("todos").select("*").eq("id", go.id).maybeSingle();
+          if (data) td.items.push(data);
+        }
+        openEdit(go.id);
+      }
     },
     leave() {
       td.active = false;

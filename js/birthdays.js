@@ -609,6 +609,8 @@
         toast(sqlHint(err), true);
       }
       render();
+      const go = PP.takePending && PP.takePending("birthdays");
+      if (go) openEditor(go.id);
     },
     leave() {
       bd.active = false;

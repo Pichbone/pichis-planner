@@ -96,7 +96,10 @@
   window.PP = {
     sb, state, cfg, modules,
     $, $$, toast, escapeHtml, translateError, withBusy,
-    storageGet, storageSet, memberName, openSheet, closeSheets
+    storageGet, storageSet, memberName, openSheet, closeSheets,
+    // Aus der Suche: Bereich öffnen und dort gleich den Eintrag zeigen
+    openLater(mod, data, hash) { window.PP._pending = { ...data, mod }; location.hash = hash; },
+    takePending(mod) { const p = window.PP._pending; if (p && p.mod === mod) { window.PP._pending = null; return p; } return null; }
   };
 
   // ---------- Daten laden ----------
@@ -221,7 +224,8 @@
     "tanken": { id: "fuel", title: "Tankpreise", module: "fuel" },
     "buecher": { id: "books", title: "Bücher", module: "books" },
     "training": { id: "fitness", title: "Training", module: "fitness" },
-    "gesundheit": { id: "health", title: "Gesundheit", module: "health" }
+    "gesundheit": { id: "health", title: "Gesundheit", module: "health" },
+    "suche": { id: "search", title: "Suche", module: "search" }
   };
   let activeView = null;
 

@@ -1244,6 +1244,8 @@
   PP.modules.calendar = {
     async enter() {
       cal.active = true;
+      const go = PP.takePending && PP.takePending("calendar");
+      if (go && go.date) cal.month = firstOfMonth(parseIso(go.date));
       render();
       try {
         await loadBase();
@@ -1254,6 +1256,7 @@
         console.error(err);
         toast(PP.translateError(err), true);
       }
+      if (go) openEvent(go.id);
     },
     leave() {
       cal.active = false;

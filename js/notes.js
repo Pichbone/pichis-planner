@@ -375,6 +375,8 @@
         console.error(err);
         toast(/relation .*notes|does not exist/i.test(err.message || "") ? "Bitte zuerst das SQL aus Schritt 11 in Supabase ausführen." : translateError(err), true);
       }
+      const go = PP.takePending && PP.takePending("notes");
+      if (go) openEditor(go.id);
     },
     leave() {
       nt.active = false;

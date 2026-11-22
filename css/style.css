@@ -1869,3 +1869,25 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .hl-settings .form { margin-top: 10px; }
 .fx-weight { margin: 0 0 10px; }
 .warn-text { color: var(--orange); font-weight: 600; }
+
+/* ===== Suche ===== */
+.home-search { margin: 0 0 12px; }
+.home-search input { width: 100%; border-radius: 99px; padding: 11px 16px; }
+.se-snip { display: block; font-size: .82rem; color: var(--muted); margin-top: 3px; line-height: 1.35; overflow-wrap: anywhere; }
+.se-list mark, #se-results mark { background: rgba(224, 112, 63, .25); color: inherit; border-radius: 3px; padding: 0 1px; }
+.se-busy { margin: 4px 0 8px; }
+
+/* ===== Fristen & Garantien ===== */
+.dl-bar { width: 100%; border: 1px solid #B7791F; background: rgba(183, 121, 31, .1); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.dl-link { margin: 0 0 8px; }
+.ar-deadlines { margin-top: 8px; }
+.dl-list { list-style: none; margin: 0; padding: 0; }
+.dl-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.dl-row.dl-sug { cursor: pointer; } .dl-row.dl-sug input { width: 20px; height: 20px; flex-shrink: 0; }
+.dl-icon { font-size: 1.2rem; flex-shrink: 0; }
+.dl-main { flex: 1; min-width: 0; display: grid; cursor: default; }
+[data-dl-open] { cursor: pointer; }
+.dl-title { font-weight: 600; } .dl-title.done { text-decoration: line-through; color: var(--muted); }
+.dl-soon { color: #B5402B; }
+.dl-form { padding: 10px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); display: grid; gap: 8px; }
+.dl-form label { margin: 0; }

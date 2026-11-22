@@ -721,7 +721,10 @@
       render();
       try { await Promise.all([loadRecipes(), loadWeek()]); subscribe(); }
       catch (err) { console.error(err); toast(sqlHint(err), true); }
+      const go = PP.takePending && PP.takePending("meals");
+      if (go) ml.tab = "recipes";
       render();
+      if (go) openRecipe(go.id);
     },
     leave() { ml.active = false; unsubscribe(); closeSheets(); },
     async resume() { if (ml.active) { try { await Promise.all([loadRecipes(), loadWeek()]); render(); } catch { /* egal */ } } else refreshTile(); },
