@@ -862,8 +862,14 @@
 
   function renderFooter() {
     const s = ar.status;
+    // Übernehmen und Abgleichen oben über der Suche
+    const top = $("#ar-actions");
+    top.hidden = !(s && s.connected);
+    top.innerHTML = s && s.connected
+      ? `<button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button><button class="btn btn-small" id="btn-ar-sync">🔄 Mit HiDrive abgleichen</button>`
+      : "";
     $("#ar-footer").innerHTML = s && s.connected
-      ? `<p class="ar-imp-cta"><button class="btn btn-small" id="btn-ar-import">📥 Aus HiDrive übernehmen</button> <button class="btn btn-small" id="btn-ar-sync">🔄 Mit HiDrive abgleichen</button></p><p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-rename-all">Dateinamen angleichen</button> · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
+      ? `<p class="muted small">📂 HiDrive${s.alias ? " · " + escapeHtml(s.alias) : ""} · Ordner „${escapeHtml((s.folder || "").split("/").pop())}“${s.can_manage ? ` · <button class="link" id="btn-ar-rename-all">Dateinamen angleichen</button> · <button class="link" id="btn-ar-relogin">Zugang ändern</button> · <button class="link" id="btn-ar-disconnect">Trennen</button>` : ""}</p>`
       : "";
   }
 
