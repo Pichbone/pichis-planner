@@ -218,7 +218,8 @@
     "muell": { id: "waste", title: "Müllabfuhr", module: "waste" },
     "urlaub": { id: "trips", title: "Urlaub & Packlisten", module: "trips" },
     "fussball": { id: "football", title: "Bundesliga", module: "football" },
-    "tanken": { id: "fuel", title: "Tankpreise", module: "fuel" }
+    "tanken": { id: "fuel", title: "Tankpreise", module: "fuel" },
+    "buecher": { id: "books", title: "Bücher", module: "books" }
   };
   let activeView = null;
 

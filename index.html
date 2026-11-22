@@ -215,6 +215,11 @@
           <div class="tile-name">Tankpreise</div>
           <div class="tile-status" id="tile-fu-status">Preise ansehen</div>
         </a>
+        <a class="tile tile-active tile-books" href="#/buecher">
+          <div class="tile-icon">📚</div>
+          <div class="tile-name">Bücher</div>
+          <div class="tile-status" id="tile-bk-status">HiDrive</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -462,6 +467,28 @@
         <button class="icon-btn" id="btn-fu-refresh" aria-label="Neu laden" title="Neu laden">↻</button>
       </div>
       <div id="fu-body"></div>
+     </div>
+
+     <!-- ===== Bücher ===== -->
+     <div id="view-books" class="view" hidden>
+      <div class="note-toolbar">
+        <input type="search" id="bk-search" placeholder="Titel, Autor oder Reihe suchen" aria-label="Bücher durchsuchen" autocomplete="off">
+        <button class="icon-btn" id="btn-bk-refresh" aria-label="Ordner neu abgleichen" title="Neu abgleichen">↻</button>
+      </div>
+      <div class="chips" id="bk-readf"></div>
+      <div class="chips" id="bk-sort"></div>
+      <p class="muted small" id="bk-status"></p>
+      <div id="bk-items"></div>
+      <form id="form-bk-settings" class="card form bk-settings" autocomplete="off">
+        <label>Meine Kindle-Adresse
+          <input type="email" name="kindle" placeholder="name_xyz@kindle.com" autocapitalize="none" spellcheck="false">
+        </label>
+        <label id="bk-folder-row">Bücher-Ordner in HiDrive
+          <input type="text" name="folder" maxlength="300" placeholder="Buecher">
+        </label>
+        <p class="muted small">Gilt nur für dich. Die Absenderadresse des Planners muss bei Amazon unter „Genehmigte E-Mail-Adressen für persönliche Dokumente“ stehen.</p>
+        <button type="submit" class="btn btn-small">Speichern</button>
+      </form>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -1120,6 +1147,20 @@
     <div class="note-actions">
       <span></span>
       <button type="button" class="link danger-link" id="btn-trip-delete" hidden>Löschen</button>
+    </div>
+  </div>
+
+  <div id="sheet-book" class="sheet sheet-tall" hidden role="dialog" aria-label="Buch">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>Buch</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="bk-detail"></div>
+    <div class="btn-row bk-actions">
+      <button type="button" class="btn btn-primary" id="btn-bk-kindle">📤 An Kindle senden</button>
+      <button type="button" class="btn" id="btn-bk-read">☐ Als gelesen markieren</button>
+      <button type="button" class="btn btn-small" id="btn-bk-download">⬇️ Herunterladen</button>
     </div>
   </div>
 
@@ -2043,6 +2084,7 @@
   <script src="/js/football.js"></script>
   <script src="/js/fuel.js"></script>
   <script src="/js/trips.js"></script>
+  <script src="/js/books.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>
