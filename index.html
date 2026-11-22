@@ -225,6 +225,11 @@
           <div class="tile-name">Training</div>
           <div class="tile-status" id="tile-fx-status">Fitnesstagebuch</div>
         </a>
+        <a class="tile tile-active tile-health" href="#/gesundheit">
+          <div class="tile-icon">❤️</div>
+          <div class="tile-name">Gesundheit</div>
+          <div class="tile-status" id="tile-hl-status">Gewicht & Wasser</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -501,6 +506,11 @@
       <div class="chips" id="fx-tabs"></div>
       <div id="fx-body"></div>
       <div id="fx-rest" class="fx-rest" hidden></div>
+     </div>
+
+     <!-- ===== Gesundheit ===== -->
+     <div id="view-health" class="view" hidden>
+      <div id="hl-body"></div>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -2108,6 +2118,7 @@
   <script src="/js/trips.js"></script>
   <script src="/js/books.js"></script>
   <script src="/js/fitness.js"></script>
+  <script src="/js/health.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>

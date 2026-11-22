@@ -62,6 +62,7 @@
       .eq("user_id", me()).order("created_at", { ascending: false }).limit(3000);
     if (st.error) throw st.error;
     fx.sets = st.data.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    try { fx.weight = PP.lastWeight ? await PP.lastWeight() : null; } catch { fx.weight = null; }
     const open = fx.sessions.find(s => !s.finished_at);
     if (open && (!fx.run || fx.run.session.id !== open.id)) restoreRun(open);
     if (!open) fx.run = null;
@@ -213,7 +214,9 @@
          <p class="muted small">1. Unter „Übungen“ deine Geräte und Übungen anlegen.<br>2. Unter „Pläne“ feste Trainingspläne zusammenstellen.<br>3. Im Studio den Plan antippen und Satz für Satz abhaken.</p>
          <button class="btn btn-primary" data-fx-tab="exercises">Erste Übung anlegen</button></div>`
       : !fx.plans.length ? `<div class="empty"><p class="muted small">Noch kein Trainingsplan.</p><button class="btn btn-primary" id="btn-fx-plan-new">+ Plan anlegen</button></div>` : "";
-    return intro +
+    const w = fx.weight;
+    const wline = `<p class="small fx-weight">⚖️ ${w ? `${Number(w.kg).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg <span class="muted">(${agoText(w.day + "T12:00:00")})</span> · ` : ""}<a href="#/gesundheit">${w ? "Gewicht eintragen" : "Gewicht eintragen (Gesundheit)"}</a></p>`;
+    return wline + intro +
       (plans ? `<h4 class="cal-sub">Training starten</h4><ul class="ar-list">${plans}</ul>` : "") +
       (fx.exercises.length ? `<button type="button" class="btn btn-small" data-fx-start="">Freies Training ohne Plan</button>` : "") +
       (hist ? `<h4 class="cal-sub">Letzte Trainings</h4><ul class="ar-list">${hist}</ul>` : "");

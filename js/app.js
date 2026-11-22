@@ -220,7 +220,8 @@
     "fussball": { id: "football", title: "Bundesliga", module: "football" },
     "tanken": { id: "fuel", title: "Tankpreise", module: "fuel" },
     "buecher": { id: "books", title: "Bücher", module: "books" },
-    "training": { id: "fitness", title: "Training", module: "fitness" }
+    "training": { id: "fitness", title: "Training", module: "fitness" },
+    "gesundheit": { id: "health", title: "Gesundheit", module: "health" }
   };
   let activeView = null;
 
