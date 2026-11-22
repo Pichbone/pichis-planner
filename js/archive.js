@@ -377,11 +377,27 @@
 
   // Text aus PDF, Word oder Textdatei – { text, pages }
   async function extractText(blob, name, mime, progress = () => {}) {
+    const r = await rawText(blob, name, mime, progress);
+    return { ...r, text: cleanText(r.text) };
+  }
+  async function rawText(blob, name, mime, progress) {
     if (/pdf/i.test(mime || "") || /\.pdf$/i.test(name || "")) return pdfText(blob, progress);
     if (isDocx(name, mime)) return { text: await docxText(blob), pages: null };
     if (isPlain(name, mime) && blob.size < 2 * 1024 * 1024) return { text: (await blob.text()).slice(0, MAX_TEXT), pages: null };
     return { text: "", pages: null };
   }
+  // Steuerzeichen (v. a. \u0000 aus PDFs) und kaputte Unicode-Reste mag die Datenbank nicht
+  function cleanText(t) {
+    let s = String(t || "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFE\uFFFF]/g, " ");
+    s = typeof s.toWellFormed === "function" ? s.toWellFormed() : s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, " ");
+    return s.replace(/[ \t]{2,}/g, " ").slice(0, 300000);
+  }
+  // Nur echte Kalendertage (kein 30.02.)
+  const validDate = d => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d || "")) return null;
+    const x = new Date(d + "T12:00:00Z");
+    return !isNaN(x) && x.toISOString().slice(0, 10) === d ? d : null;
+  };
   const canRead = (name, mime) => /pdf/i.test(mime || "") || /\.pdf$/i.test(name || "") || isDocx(name, mime) || isPlain(name, mime);
 
   async function pdfText(file, progress) {
@@ -1084,7 +1100,7 @@
     const f = e.target, btn = $("#btn-ar-imp");
     const chosen = [...imp.picked].sort((a, b) => a - b).map(i => imp.files[i]);
     imp.busy = true; btn.disabled = true;
-    let done = 0, aiFail = "";
+    let done = 0, aiFail = "", failMsg = "";
     const failed = [];
     try {
       for (const file of chosen) {
@@ -1108,13 +1124,17 @@
         // Unterordner bleibt die Kategorie; nur Dateien direkt im Archiv-Ordner bekommen die KI-Kategorie
         const category = (file.folder || (sug && sug.category) || "Sonstiges").slice(0, 60);
         const tagIds = [...new Set([...imp.tags, ...((sug && sug.tag_ids) || [])])].filter(id => ar.tags.some(t => t.id === id));
-        const { data: row, error } = await sb.from("archive_docs").insert({
-          household_id: hid(), title: ((sug && sug.title) || parts.title).slice(0, 200), category,
-          doc_date: (sug && sug.doc_date) || parts.date || (file.modified ? file.modified.slice(0, 10) : null), notes: ((sug && sug.notes) || "").slice(0, 2000),
+        const rec = {
+          household_id: hid(), title: (((sug && sug.title) || "").trim() || parts.title).slice(0, 200), category,
+          doc_date: validDate(sug && sug.doc_date) || validDate(parts.date) || validDate(file.modified ? file.modified.slice(0, 10) : null),
+          notes: ((sug && sug.notes) || "").slice(0, 2000),
           tag_ids: tagIds, is_private: f.is_private.checked,
           file_name: file.name.slice(0, 255), file_path: file.path, size: file.size || 0, mime, pages, text_content: text
-        }).select("id, title, doc_date, file_name").single();
-        if (error) { console.warn(error); failed.push(file.name); continue; }
+        };
+        let { data: row, error } = await sb.from("archive_docs").insert(rec).select("id, title, doc_date, file_name").single();
+        // Zweiter Versuch ohne ausgelesenen Text (falls der die Datenbank stört)
+        if (error && text) ({ data: row, error } = await sb.from("archive_docs").insert({ ...rec, text_content: "" }).select("id, title, doc_date, file_name").single());
+        if (error) { console.warn(file.name, error); failed.push(file.name); if (!failMsg) failMsg = translateError(error); continue; }
         done++;
         const wrongFolder = category !== (file.folder || "");
         const wrongName = f.rename.checked && !sameName(row.file_name, nameFor(row.title, row.doc_date, category, row.file_name));
@@ -1129,7 +1149,7 @@
     }
     closeSheets();
     toast(failed.length
-      ? `${done} übernommen, ${failed.length} fehlgeschlagen: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " …" : ""}`
+      ? `${done} übernommen, ${failed.length} fehlgeschlagen: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? " …" : ""}${failMsg ? ` – Grund: ${failMsg}` : ""}`
       : `${done} Dokument${done === 1 ? "" : "e"} übernommen.${aiFail ? ` KI-Vorschläge teilweise nicht möglich: ${aiFail}` : ""}`, !!failed.length || !!aiFail);
   });
 
