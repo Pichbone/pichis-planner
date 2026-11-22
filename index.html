@@ -220,6 +220,11 @@
           <div class="tile-name">Bücher</div>
           <div class="tile-status" id="tile-bk-status">HiDrive</div>
         </a>
+        <a class="tile tile-active tile-fitness" href="#/training">
+          <div class="tile-icon">🏋️</div>
+          <div class="tile-name">Training</div>
+          <div class="tile-status" id="tile-fx-status">Fitnesstagebuch</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -489,6 +494,13 @@
         <p class="muted small">Gilt nur für dich. Die Absenderadresse des Planners muss bei Amazon unter „Genehmigte E-Mail-Adressen für persönliche Dokumente“ stehen.</p>
         <button type="submit" class="btn btn-small">Speichern</button>
       </form>
+     </div>
+
+     <!-- ===== Fitnesstagebuch ===== -->
+     <div id="view-fitness" class="view" hidden>
+      <div class="chips" id="fx-tabs"></div>
+      <div id="fx-body"></div>
+      <div id="fx-rest" class="fx-rest" hidden></div>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -1149,6 +1161,15 @@
       <span></span>
       <button type="button" class="link danger-link" id="btn-trip-delete" hidden>Löschen</button>
     </div>
+  </div>
+
+  <div id="sheet-fx" class="sheet sheet-tall" hidden role="dialog" aria-label="Training">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="fx-sheet-title">Training</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div id="fx-sheet-body"></div>
   </div>
 
   <div id="sheet-book" class="sheet sheet-tall" hidden role="dialog" aria-label="Buch">
@@ -2086,6 +2107,7 @@
   <script src="/js/fuel.js"></script>
   <script src="/js/trips.js"></script>
   <script src="/js/books.js"></script>
+  <script src="/js/fitness.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>

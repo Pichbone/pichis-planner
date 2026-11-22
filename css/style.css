@@ -1783,3 +1783,39 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .bk-desc { font-size: .9rem; line-height: 1.45; max-height: 30vh; overflow: auto; color: var(--ink); }
 .bk-actions { margin: 10px 0 6px; }
 .bk-settings { margin-top: 8px; }
+
+/* ===== Fitnesstagebuch ===== */
+:root { --fit: #DC2626; --fit-soft: #FDE7E7; }
+@media (prefers-color-scheme: dark) { :root { --fit: #F87171; --fit-soft: #2D1A1A; } }
+.tile-fitness { border-color: var(--fit); background: var(--fit-soft); } .tile-fitness .tile-status { color: var(--fit); }
+#view-fitness { padding-bottom: 80px; }
+.fx-plan .fx-go { margin-left: auto; color: var(--fit); font-size: 1.1rem; padding-left: 8px; }
+.fx-plan:disabled { opacity: .55; }
+.fx-run-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; border-color: var(--fit); }
+.fx-run-head p { margin: 2px 0 0; }
+.fx-ex { margin-bottom: 10px; padding: 12px; }
+.fx-ex-done { opacity: .75; }
+.fx-ex-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fx-ex-name { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; font-size: 1.02rem; color: var(--ink); text-align: left; cursor: pointer; }
+.fx-last { margin: 2px 0 8px; }
+.fx-set { display: grid; grid-template-columns: 26px 1fr auto 1.3fr 44px 40px; align-items: center; gap: 6px; padding: 4px 0; }
+.fx-set input { min-width: 0; padding: 9px 8px; text-align: center; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.fx-set.done input { background: var(--fit-soft); color: var(--ink); opacity: 1; -webkit-text-fill-color: var(--ink); }
+.fx-set.done .check-btn { background: var(--fit); border-color: var(--fit); color: #fff; }
+.fx-no { width: 24px; height: 24px; border-radius: 99px; background: var(--surface-2); display: grid; place-items: center; font-size: .78rem; font-weight: 700; color: var(--muted); }
+.fx-x, .fx-unit { color: var(--muted); font-size: .9rem; white-space: nowrap; }
+.fx-addex { margin: 10px 0; } .fx-addex select { width: 100%; }
+.fx-rest { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 40; display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 2px solid var(--fit); box-shadow: 0 8px 24px rgba(0,0,0,.18); overflow: hidden; max-width: 640px; margin: 0 auto; }
+.fx-rest-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--fit-soft); z-index: -1; transition: width .25s linear; }
+.fx-rest-text { flex: 1; font-size: 1rem; } .fx-rest-text strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; color: var(--fit); }
+.fx-hist { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.fx-pr { margin: 0 0 8px; }
+.fx-chart { width: 100%; height: auto; color: var(--fit); background: var(--surface-2); border-radius: 12px; margin-top: 4px; }
+.fx-chart-label { font-size: 10px; fill: var(--muted); }
+.fx-plan-items { display: grid; gap: 8px; margin-bottom: 8px; }
+.fx-pi { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.fx-pi-name { grid-column: 1 / -1; font-weight: 600; }
+.fx-pi-f { font-size: .75rem; color: var(--muted); display: grid; gap: 2px; margin: 0; }
+.fx-pi-f input { padding: 7px 6px; text-align: center; }
+.fx-pi-btns { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end; }

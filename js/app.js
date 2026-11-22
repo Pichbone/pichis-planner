@@ -219,7 +219,8 @@
     "urlaub": { id: "trips", title: "Urlaub & Packlisten", module: "trips" },
     "fussball": { id: "football", title: "Bundesliga", module: "football" },
     "tanken": { id: "fuel", title: "Tankpreise", module: "fuel" },
-    "buecher": { id: "books", title: "Bücher", module: "books" }
+    "buecher": { id: "books", title: "Bücher", module: "books" },
+    "training": { id: "fitness", title: "Training", module: "fitness" }
   };
   let activeView = null;
 
