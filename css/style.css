@@ -1914,3 +1914,18 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .fr-recipe ul { margin: 6px 0; padding-left: 20px; font-size: .9rem; }
 .fr-steps { white-space: pre-wrap; }
 .fr-chip { display: inline-block; padding: 4px 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); font-size: .85rem; }
+
+/* ===== Auto / Tankbuch ===== */
+:root { --car: #475569; --car-soft: #E9EDF2; }
+@media (prefers-color-scheme: dark) { :root { --car: #A9B6C8; --car-soft: #1E242C; } }
+.tile-car { border-color: var(--car); background: var(--car-soft); } .tile-car .tile-status { color: var(--car); }
+.car-add { margin-bottom: 12px; }
+.car-stats { margin-bottom: 12px; }
+.car-big { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--car); }
+.car-big small { font-size: .95rem; font-weight: 600; color: var(--muted); }
+.car-warn { color: var(--orange); font-weight: 600; }
+.car-chart { width: 100%; height: auto; color: var(--car); background: var(--surface-2); border-radius: 12px; margin-top: 8px; }
+.car-chart-label { font-size: 10px; fill: var(--muted); }
+.fuel-stations { display: grid; gap: 6px; margin: 8px 0; }
+.fuel-st { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.fuel-st .muted { grid-column: 1; } .fuel-st-p { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-weight: 800; font-variant-numeric: tabular-nums; }

@@ -234,6 +234,11 @@
           <div class="tile-name">Gesundheit</div>
           <div class="tile-status" id="tile-hl-status">Gewicht & Wasser</div>
         </a>
+        <a class="tile tile-active tile-car" href="#/auto">
+          <div class="tile-icon">🚗</div>
+          <div class="tile-name">Auto</div>
+          <div class="tile-status" id="tile-car-status">Tankbuch</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -524,6 +529,12 @@
         <input type="search" id="se-input" placeholder="Wonach suchst du?" aria-label="Alles durchsuchen" autocomplete="off" enterkeyhint="search">
       </div>
       <div id="se-results"></div>
+     </div>
+
+     <!-- ===== Auto / Tankbuch ===== -->
+     <div id="view-car" class="view" hidden>
+      <div class="chips" id="car-chips"></div>
+      <div id="car-body"></div>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -1216,6 +1227,57 @@
       <button type="submit" class="btn btn-primary btn-block" id="btn-fr-go">✨ Was koche ich?</button>
     </form>
     <div id="fr-result"></div>
+  </div>
+
+  <div id="sheet-fuel" class="sheet sheet-tall" hidden role="dialog" aria-label="Tanken">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="fuel-sheet-title">Tanken</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn btn-small" id="btn-fuel-photo">📸 Beleg fotografieren</button>
+      <button type="button" class="btn btn-small" id="btn-fuel-nearby">📍 Tankstelle in der Nähe</button>
+    </div>
+    <input type="file" id="fuel-photo" accept="image/*" capture="environment" hidden>
+    <p class="small muted" id="fuel-hint"></p>
+    <div id="fuel-stations" class="fuel-stations"></div>
+    <form id="form-fuel" class="form" autocomplete="off">
+      <div class="form-row form-row-even">
+        <label>Datum <input type="date" name="day" required></label>
+        <label>Kilometerstand <input type="text" inputmode="numeric" name="odometer" required></label>
+      </div>
+      <div class="form-row form-row-even">
+        <label>Liter <input type="text" inputmode="decimal" name="liters" placeholder="z. B. 42,37" required></label>
+        <label>€ pro Liter <input type="text" inputmode="decimal" name="price_l" placeholder="1,799"></label>
+      </div>
+      <label>Betrag (€) <input type="text" inputmode="decimal" name="total" placeholder="wird aus Liter × Preis berechnet"></label>
+      <label class="switch"><input type="checkbox" name="full_tank" checked><span>Vollgetankt</span></label>
+      <label>Tankstelle <input type="text" name="station" maxlength="120" placeholder="optional"></label>
+      <label>Notiz <input type="text" name="note" maxlength="300" placeholder="z. B. Urlaubsfahrt, Winterreifen"></label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <p class="muted small">Für den Verbrauch zählt „Vollgetankt“: Die App rechnet von Volltankung zu Volltankung, Teiltankungen dazwischen werden mitgezählt.</p>
+    <div class="note-actions"><span></span><button type="button" class="link danger-link" id="btn-fuel-delete" hidden>Löschen</button></div>
+  </div>
+
+  <div id="sheet-car" class="sheet" hidden role="dialog" aria-label="Auto">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="car-sheet-title">Neues Auto</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <form id="form-car" class="form" autocomplete="off">
+      <label>Name <input type="text" name="name" maxlength="60" placeholder="z. B. Golf" required></label>
+      <div class="form-row form-row-even">
+        <label>Kennzeichen <input type="text" name="plate" maxlength="20" placeholder="optional" autocapitalize="characters"></label>
+        <label>Kraftstoff <select name="fuel_type"><option value="e5">Super E5</option><option value="e10">Super E10</option><option value="diesel">Diesel</option></select></label>
+      </div>
+      <label>Tankgröße (Liter) <span class="hint">(optional)</span><input type="text" inputmode="numeric" name="tank_l" placeholder="z. B. 50"></label>
+      <label class="switch"><input type="checkbox" name="is_private"><span>🔒 Privat (nur für mich)</span></label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div class="note-actions"><span></span><button type="button" class="link danger-link" id="btn-car-delete" hidden>Auto löschen</button></div>
   </div>
 
   <div id="sheet-book" class="sheet sheet-tall" hidden role="dialog" aria-label="Buch">
@@ -2167,6 +2229,7 @@
   <script src="/js/health.js"></script>
   <script src="/js/search.js"></script>
   <script src="/js/fridge.js"></script>
+  <script src="/js/car.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>

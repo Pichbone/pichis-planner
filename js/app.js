@@ -225,7 +225,8 @@
     "buecher": { id: "books", title: "Bücher", module: "books" },
     "training": { id: "fitness", title: "Training", module: "fitness" },
     "gesundheit": { id: "health", title: "Gesundheit", module: "health" },
-    "suche": { id: "search", title: "Suche", module: "search" }
+    "suche": { id: "search", title: "Suche", module: "search" },
+    "auto": { id: "car", title: "Auto", module: "car" }
   };
   let activeView = null;
 
