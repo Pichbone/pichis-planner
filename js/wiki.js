@@ -8,7 +8,7 @@
   "use strict";
 
   const PP = window.PP;
-  const { sb, state, $, toast, escapeHtml, translateError, storageGet, storageSet, memberName, openSheet, closeSheets } = PP;
+  const { sb, state, cfg, $, toast, escapeHtml, translateError, storageGet, storageSet, memberName, openSheet, closeSheets } = PP;
 
   const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
   const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -32,7 +32,9 @@
     draftTags: new Set(),
     urls: new Map(),
     useText: "",
-    searchToken: 0
+    searchToken: 0,
+    hd: null,            // HiDrive verbunden? (dann landen Anhänge dort)
+    hdOld: 0             // Anhänge, die noch im Supabase-Speicher liegen
   };
 
   const me = () => state.session.user.id;
@@ -48,7 +50,7 @@
   const DROP = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META", "FORM", "INPUT", "BUTTON",
     "SELECT", "TEXTAREA", "SVG", "MATH", "TEMPLATE", "NOSCRIPT", "HEAD", "TITLE", "VIDEO", "AUDIO", "CANVAS"]);
   const RENAME = { H1: "H2", H4: "H3", H5: "H3", H6: "H3", SECTION: "DIV", ARTICLE: "DIV", HEADER: "DIV", FOOTER: "DIV", TABLE: "DIV", TR: "P", TD: "SPAN", TH: "SPAN", S: "SPAN", STRIKE: "SPAN" };
-  const RE_PATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[\w.-]{1,120}$/i;
+  const RE_PATH = /^(?:[0-9a-f-]{36}\/[0-9a-f-]{36}\/[\w.-]{1,120}|hd:\/users\/[^"<>\u0000-\u001f]{1,900})$/i;
 
   function cleanNode(node, doc) {
     for (const child of [...node.childNodes]) {
@@ -163,13 +165,61 @@
     if (wk.channel) { sb.removeChannel(wk.channel); wk.channel = null; }
   }
 
+  // ---------- HiDrive (Funktion „hidrive“) ----------
+  const isHd = p => String(p || "").startsWith("hd:");
+  async function authHeaders() {
+    const { data } = await sb.auth.getSession();
+    return { Authorization: `Bearer ${data.session.access_token}`, apikey: cfg.SUPABASE_KEY };
+  }
+  async function hdCall(action, body = {}) {
+    const res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/hidrive`, {
+      method: "POST", headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...body })
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || `HiDrive (${res.status})`); }
+    return res;
+  }
+  async function hdStatus() {
+    if (wk.hd !== null) return wk.hd;
+    try { wk.hd = !!(await (await hdCall("status")).json()).connected; } catch { wk.hd = false; }
+    return wk.hd;
+  }
+  // Datei hochladen – in HiDrive, wenn verbunden, sonst wie bisher in Supabase
+  async function putFile(blob, name, type) {
+    if (await hdStatus()) {
+      const res = await fetch(`${cfg.SUPABASE_URL}/functions/v1/hidrive`, {
+        method: "POST",
+        headers: { ...(await authHeaders()), "Content-Type": "application/octet-stream", "x-pp-action": "wiki_upload",
+          "x-pp-page": wk.editing, "x-pp-name": encodeURIComponent(name) },
+        body: blob
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `Hochladen fehlgeschlagen (${res.status}).`);
+      return j.path;
+    }
+    const path = `${hid()}/${wk.editing}/${crypto.randomUUID()}-${safeName(name)}`;
+    const up = await sb.storage.from("wiki-files").upload(path, blob, { contentType: type, upsert: false });
+    if (up.error) throw up.error;
+    return path;
+  }
+
   async function signed(paths) {
     const now = Date.now();
     const need = paths.filter(p => { const c = wk.urls.get(p); return !c || c.until < now + 60000; });
-    if (need.length) {
-      const { data } = await sb.storage.from("wiki-files").createSignedUrls(need, 3600);
+    const st = need.filter(p => !isHd(p)), hd = [...new Set(need.filter(isHd))];
+    if (st.length) {
+      const { data } = await sb.storage.from("wiki-files").createSignedUrls(st, 3600);
       for (const d of data || []) if (d.signedUrl) wk.urls.set(d.path, { url: d.signedUrl, until: now + 3600 * 1000 });
     }
+    // HiDrive-Dateien über die Funktion holen und lokal merken
+    await Promise.all(hd.map(async p => {
+      try {
+        const blob = await (await hdCall("wiki_fetch", { path: p })).blob();
+        const old = wk.urls.get(p);
+        if (old && old.blob) URL.revokeObjectURL(old.url);
+        wk.urls.set(p, { url: URL.createObjectURL(blob), until: Infinity, blob: true });
+      } catch (err) { console.warn("Wiki-Datei:", p, err); }
+    }));
     return paths.map(p => (wk.urls.get(p) || {}).url || "");
   }
 
@@ -197,6 +247,39 @@
       </span>
     </a></li>`;
   }
+
+  // ---------- Umzug der alten Anhänge nach HiDrive (einmalig, Verwaltung) ----------
+  async function checkMove() {
+    const box = $("#wiki-move");
+    if (!box) return;
+    if (state.role !== "owner" || !(await hdStatus())) { box.hidden = true; return; }
+    try { wk.hdOld = (await (await hdCall("wiki_status")).json()).old || 0; } catch { wk.hdOld = 0; }
+    renderMove();
+  }
+  function renderMove(msg) {
+    const box = $("#wiki-move");
+    box.hidden = !wk.hdOld && !msg;
+    box.innerHTML = msg || `<span>📦 ${wk.hdOld} Anh${wk.hdOld === 1 ? "ang liegt" : "änge liegen"} noch im Supabase-Speicher</span>
+      <button class="btn btn-small" id="btn-wiki-move">Nach HiDrive umziehen</button>`;
+  }
+  $("#wiki-move").addEventListener("click", async e => {
+    if (!e.target.closest("#btn-wiki-move")) return;
+    if (!confirm(`${wk.hdOld} Anhänge und Bilder in den HiDrive-Ordner „Wiki“ verschieben? Danach liegen sie nicht mehr in Supabase.`)) return;
+    let moved = 0, failed = 0, errs = [];
+    try {
+      for (let round = 0; round < 50; round++) {
+        renderMove(`<span>📦 Wird umgezogen … ${moved} erledigt${wk.hdOld ? `, noch ${wk.hdOld}` : ""}</span>`);
+        const r = await (await hdCall("wiki_migrate")).json();
+        moved += r.moved; failed += r.failed; errs = errs.concat(r.errors || []);
+        wk.hdOld = r.remaining;
+        if (!r.remaining || (!r.moved && r.failed)) break;
+      }
+    } catch (err) { errs.push(err.message); }
+    wk.urls = new Map();
+    renderMove();
+    toast(failed || errs.length ? `${moved} umgezogen, ${failed} nicht: ${errs.slice(0, 2).join(" · ")}` : `${moved} Anhänge liegen jetzt in HiDrive (Ordner „Wiki“).`, !!(failed || errs.length));
+    if (wk.current) showPage(wk.current.id);
+  });
 
   function renderList() {
     if (!wk.active || PP.route.param) return;
@@ -519,13 +602,12 @@
       if (!wk.editing) await save(true);
       for (const file of files) {
         const blob = await shrink(file);
-        const path = `${hid()}/${wk.editing}/${crypto.randomUUID()}.jpg`;
-        const up = await sb.storage.from("wiki-files").upload(path, blob, { contentType: "image/jpeg", upsert: false });
-        if (up.error) throw up.error;
+        const base = (file.name || "Bild").replace(/\.[^.]+$/, "") || "Bild";
+        const path = await putFile(blob, `${base}.jpg`, "image/jpeg");
         const [url] = await signed([path]);
         const ed = $("#wiki-editor");
         ed.focus();
-        document.execCommand("insertHTML", false, `<p><img data-path="${path}" src="${escapeHtml(url)}" alt=""></p>`);
+        document.execCommand("insertHTML", false, `<p><img data-path="${escapeHtml(path)}" src="${escapeHtml(url)}" alt=""></p>`);
       }
     } catch (err) {
       toast(translateError(err), true);
@@ -560,6 +642,12 @@
     return { text: text.replace(/\n{3,}/g, "\n\n").trim().slice(0, MAX_TEXT), pages: n };
   }
 
+  // Steuerzeichen (z. B. \u0000 aus PDFs) mag die Datenbank nicht
+  function cleanText(t) {
+    let x = String(t || "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFE\uFFFF]/g, " ");
+    if (typeof x.toWellFormed === "function") x = x.toWellFormed();
+    return x.slice(0, MAX_TEXT);
+  }
   function safeName(name) {
     return (name || "datei").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(-100) || "datei";
   }
@@ -589,14 +677,12 @@
           text = (await file.text()).slice(0, MAX_TEXT);
         }
         btn.textContent = "Lädt hoch …";
-        const path = `${hid()}/${wk.editing}/${crypto.randomUUID()}-${safeName(file.name)}`;
         const type = file.type || (isPdf ? "application/pdf" : "application/octet-stream");
-        const up = await sb.storage.from("wiki-files").upload(path, file, { contentType: type, upsert: false });
-        if (up.error) throw up.error;
+        const path = await putFile(file, file.name, type);
         const { data, error } = await sb.from("wiki_files").insert({
-          page_id: wk.editing, household_id: hid(), path, name: file.name.slice(0, 255), size: file.size, mime: type, pages, text_content: text
+          page_id: wk.editing, household_id: hid(), path, name: file.name.slice(0, 255), size: file.size, mime: type, pages, text_content: cleanText(text)
         }).select("id, page_id, path, name, size, mime, pages, created_at").single();
-        if (error) { await sb.storage.from("wiki-files").remove([path]); throw error; }
+        if (error) { if (!isHd(path)) await sb.storage.from("wiki-files").remove([path]); throw error; }
         wk.files.push({ ...data, has_text: !!text.trim() });
         toast(isPdf ? (text ? `„${file.name}“ gespeichert – Text ist durchsuchbar.` : `„${file.name}“ gespeichert (kein Text gefunden – eingescannt?).`) : `„${file.name}“ gespeichert.`);
       }
@@ -614,9 +700,13 @@
     if (!b) return;
     const f = wk.files.find(x => x.id === b.dataset.delWikiFile);
     if (!f || !confirm(`Anhang „${f.name}“ löschen?`)) return;
-    const { error } = await sb.from("wiki_files").delete().eq("id", f.id);
-    if (error) { toast(translateError(error), true); return; }
-    await sb.storage.from("wiki-files").remove([f.path]);
+    if (isHd(f.path)) {
+      try { await hdCall("wiki_delete", { file_id: f.id }); } catch (err) { toast(err.message, true); return; }
+    } else {
+      const { error } = await sb.from("wiki_files").delete().eq("id", f.id);
+      if (error) { toast(translateError(error), true); return; }
+      await sb.storage.from("wiki-files").remove([f.path]);
+    }
     wk.files = wk.files.filter(x => x.id !== f.id);
     renderEditFiles();
   });
@@ -666,9 +756,14 @@
     const p = wk.current;
     if (!p || !confirm(`Seite „${p.title}“ mit allen Anhängen löschen?`)) return;
     try {
-      const folder = `${p.household_id}/${p.id}`;
-      const { data: objs } = await sb.storage.from("wiki-files").list(folder, { limit: 1000 });
-      if (objs && objs.length) await sb.storage.from("wiki-files").remove(objs.map(o => `${folder}/${o.name}`));
+      try {
+        await hdCall("wiki_page_files", { page_id: p.id });   // Anhänge + Bilder (HiDrive und Supabase)
+      } catch (err) {
+        if (/hd:/.test(p.content_html || "") || wk.files.some(f => isHd(f.path))) throw err;
+        const folder = `${p.household_id}/${p.id}`;
+        const { data: objs } = await sb.storage.from("wiki-files").list(folder, { limit: 1000 });
+        if (objs && objs.length) await sb.storage.from("wiki-files").remove(objs.map(o => `${folder}/${o.name}`));
+      }
       const { error } = await sb.from("wiki_pages").delete().eq("id", p.id);
       if (error) throw error;
       wk.pages = wk.pages.filter(x => x.id !== p.id);
@@ -944,6 +1039,7 @@
         $("#wiki-search").value = wk.query;
         renderList();
       }
+      if (first) checkMove();
     },
     leave() {
       wk.active = false;
@@ -955,7 +1051,7 @@
       else refreshTile();
     },
     refreshTile,
-    reset() { this.leave(); wk.pages = []; wk.current = null; wk.urls = new Map(); }
+    reset() { this.leave(); wk.pages = []; wk.current = null; wk.urls = new Map(); wk.hd = null; wk.hdOld = 0; }
   };
 
   PP._wiki = { sanitize, htmlToPlain, placeholders, fill, renderAnswer };
