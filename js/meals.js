@@ -699,6 +699,7 @@
       return;
     }
     if (b.id === "btn-meal-shop") { openShop().catch(err => toast(translateError(err), true)); return; }
+    if (b.id === "btn-meal-fridge") { if (PP.fridge) PP.fridge.open(); return; }
     if (b.id === "btn-recipe-add") { openRecipe(null); return; }
   });
   $("#recipe-search").addEventListener("input", e => { ml.query = e.target.value; renderRecipes(); });

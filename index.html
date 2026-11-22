@@ -426,6 +426,7 @@
         </div>
         <ul class="meal-days" id="meal-days"></ul>
         <button class="btn btn-primary btn-block" id="btn-meal-shop">🛒 Zutaten auf die Einkaufsliste</button>
+        <button class="btn btn-block fr-open" id="btn-meal-fridge">📸 Was koche ich? – Kühlschrank-Koch</button>
       </div>
       <div id="meal-recipes" hidden>
         <div class="note-toolbar">
@@ -1193,6 +1194,28 @@
       <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
     </div>
     <div id="fx-sheet-body"></div>
+  </div>
+
+  <div id="sheet-fridge" class="sheet sheet-tall" hidden role="dialog" aria-label="Kühlschrank-Koch">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2>📸 Was koche ich?</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <p class="muted small">Fotografier den offenen Kühlschrank oder Vorrat (bis zu 3 Fotos) – oder tipp ein, was da ist. Die KI schlägt Gerichte vor, zuerst aus deinen eigenen Rezepten.</p>
+    <div class="fr-photos" id="fr-photos"></div>
+    <input type="file" id="fr-input" accept="image/*" capture="environment" multiple hidden>
+    <form id="form-fridge" class="form" autocomplete="off">
+      <label>Was ist sonst noch da? <span class="hint">(optional)</span>
+        <textarea name="text" rows="2" maxlength="1000" placeholder="z. B. Nudeln, Reis, Dosentomaten · Lust auf etwas Schnelles"></textarea>
+      </label>
+      <div class="form-row form-row-even">
+        <label>Personen <input type="number" name="servings" min="1" max="20" value="2"></label>
+        <label class="switch fr-own"><input type="checkbox" name="own"><span>Nur meine Rezepte</span></label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="btn-fr-go">✨ Was koche ich?</button>
+    </form>
+    <div id="fr-result"></div>
   </div>
 
   <div id="sheet-book" class="sheet sheet-tall" hidden role="dialog" aria-label="Buch">
@@ -2143,6 +2166,7 @@
   <script src="/js/fitness.js"></script>
   <script src="/js/health.js"></script>
   <script src="/js/search.js"></script>
+  <script src="/js/fridge.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>

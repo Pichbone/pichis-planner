@@ -1891,3 +1891,26 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .dl-soon { color: #B5402B; }
 .dl-form { padding: 10px; margin: 8px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); display: grid; gap: 8px; }
 .dl-form label { margin: 0; }
+
+/* ===== Kühlschrank-Koch ===== */
+.fr-open { margin-top: 8px; }
+.fr-photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.fr-thumb { position: relative; width: 92px; height: 92px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.fr-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fr-thumb button { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: .75rem; cursor: pointer; }
+.fr-add { width: 92px; height: 92px; border-radius: 12px; border: 2px dashed var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 1.6rem; display: grid; place-items: center; align-content: center; gap: 2px; cursor: pointer; }
+.fr-add span { font-size: .72rem; font-weight: 600; color: var(--muted); }
+.fr-own { align-self: end; margin-bottom: 6px; }
+.fr-seen { display: flex; flex-wrap: wrap; gap: 6px; }
+.fr-card { margin-bottom: 10px; padding: 12px; }
+.fr-card p { margin: 4px 0; }
+.fr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 1.05rem; }
+.fr-badge { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); white-space: nowrap; }
+.fr-badge.own { background: rgba(47, 93, 80, .15); color: var(--green, #2F5D50); }
+.fr-actions { margin-top: 8px; align-items: center; }
+.fr-plan { display: inline-flex; gap: 6px; align-items: center; }
+.fr-plan input { padding: 6px 8px; max-width: 150px; }
+.fr-recipe { margin: 6px 0; } .fr-recipe summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
+.fr-recipe ul { margin: 6px 0; padding-left: 20px; font-size: .9rem; }
+.fr-steps { white-space: pre-wrap; }
+.fr-chip { display: inline-block; padding: 4px 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); font-size: .85rem; }
