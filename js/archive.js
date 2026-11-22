@@ -141,7 +141,7 @@
 
 
   // ---------- Daten ----------
-  const LIST_FIELDS = "id, title, category, doc_date, notes, tag_ids, file_name, size, mime, pages, has_text, is_private, created_by, created_at, updated_at";
+  const LIST_FIELDS = "id, title, category, doc_date, notes, tag_ids, file_name, file_path, size, mime, pages, has_text, is_private, created_by, created_at, updated_at";
 
   async function loadAll() {
     const [d, t] = await Promise.all([
@@ -392,6 +392,11 @@
     s = typeof s.toWellFormed === "function" ? s.toWellFormed() : s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, " ");
     return s.replace(/[ \t]{2,}/g, " ").slice(0, 300000);
   }
+  // Kürzlich gelöschte Dateien: HiDrive zeigt sie manchmal noch ein paar Minuten in der Liste
+  const GONE_KEY = "pp_ar_gone", GONE_MS = 60 * 60 * 1000;
+  const goneList = () => { try { return JSON.parse(storageGet(GONE_KEY) || "[]").filter(x => Date.now() - x.t < GONE_MS); } catch { return []; } };
+  const markGone = path => { if (path) storageSet(GONE_KEY, JSON.stringify([...goneList(), { p: path.normalize("NFC"), t: Date.now() }].slice(-200))); };
+  const isGone = path => goneList().some(x => x.p === String(path || "").normalize("NFC"));
   // Nur echte Kalendertage (kein 30.02.)
   const validDate = d => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d || "")) return null;
@@ -709,6 +714,7 @@
         if (!confirm(`${err.message}\n\nEintrag trotzdem aus der App entfernen?`)) return;
         await call("delete", { doc_id: d.id, force: true });
       }
+      markGone(d.file_path);
       ar.docs = ar.docs.filter(x => x.id !== d.id);
       closeSheets();
       toast("Gelöscht.");
@@ -861,7 +867,7 @@
         const r = await call("scan");
         if (r.fixed) { await loadAll(); render(); }
         toast([r.fixed ? `${r.fixed} Eintr${r.fixed === 1 ? "ag" : "äge"} an HiDrive angepasst` : "Alles passt zu HiDrive",
-          r.files && r.files.length ? `${r.files.length} neue Datei${r.files.length === 1 ? "" : "en"} zum Übernehmen` : "",
+          r.files && r.files.filter(f => !isGone(f.path)).length ? `${r.files.filter(f => !isGone(f.path)).length} neue Datei${r.files.filter(f => !isGone(f.path)).length === 1 ? "" : "en"} zum Übernehmen` : "",
           r.missing ? `${r.missing} Datei${r.missing === 1 ? "" : "en"} in HiDrive nicht gefunden` : ""].filter(Boolean).join(" · ") + ".", !!r.missing);
       } catch (err) { toast(err.message, true); }
       finally { renderFooter(); }
@@ -1051,7 +1057,7 @@
     try {
       const r = await call("scan");
       if (r.fixed) { await loadAll(); render(); }
-      imp.files = r.files || [];
+      imp.files = (r.files || []).filter(f => !isGone(f.path));
       imp.picked = new Set(imp.files.map((_, i) => i));
       $("#ar-imp-info").textContent = imp.files.length
         ? `${imp.files.length} neue Datei${imp.files.length === 1 ? "" : "en"} im Ordner „${(r.root || "").split("/").pop()}“ gefunden.`
