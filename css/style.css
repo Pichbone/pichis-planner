@@ -1950,3 +1950,8 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .gift-taken { color: #16A34A; font-weight: 600; font-size: .9rem; }
 .gift-mine { color: var(--gift); font-weight: 700; font-size: .9rem; }
 .gift-secret { background: var(--gift-soft); padding: 8px 10px; border-radius: 10px; }
+
+.news-head-btns { display: inline-flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+
+.bk-genre-ai { border-style: dashed; }
+.bk-genre-pick { display: grid; gap: 4px; margin-top: 12px; font-size: .9rem; }

@@ -33,7 +33,8 @@
     marks: new Map(),   // link → { read_at, starred, title, source, image, published, updated_at }
     marksReady: false,
     sqlMissing: false,
-    found: null         // Ergebnis der Feed-Suche
+    found: null,        // Ergebnis der Feed-Suche
+    hideRead: storageGet("pp_news_hideread") === "1"
   };
 
   const uid = () => state.session && state.session.user.id;
@@ -181,17 +182,24 @@
       box.innerHTML = `<p class="muted cal-empty">${isFeedCat(nw.cat) ? "Feeds werden geladen …" : "Nachrichten werden geladen …"}</p>`;
       return;
     }
-    shown = d.items;
-    if (!shown.length) {
+    const all = d.items;
+    if (!all.length) {
+      shown = [];
       box.innerHTML = `<p class="muted cal-empty">Gerade keine Meldungen.${d.errors && d.errors.length ? ` Nicht erreichbar: ${escapeHtml(d.errors.join(", "))}` : ""}</p>`;
       return;
     }
-    const unread = shown.filter(it => !isRead(it.link)).length;
+    const unread = all.filter(it => !isRead(it.link)).length;
+    shown = nw.hideRead ? all.filter(it => !isRead(it.link)) : all;
+    const hidden = all.length - shown.length;
     box.innerHTML = `<div class="news-head">
-        <span class="muted small">${unread ? `${unread} ungelesen` : "Alles gelesen ✓"}</span>
-        ${unread ? `<button type="button" class="link" id="btn-news-allread">Alle als gelesen markieren</button>` : ""}
+        <span class="muted small">${unread ? `${unread} ungelesen` : "Alles gelesen ✓"}${hidden ? ` · ${hidden} ausgeblendet` : ""}</span>
+        <span class="news-head-btns">
+          <button type="button" class="link" id="btn-news-hideread">${nw.hideRead ? "👁 Gelesene zeigen" : "Gelesene ausblenden"}</button>
+          ${unread ? `<button type="button" class="link" id="btn-news-allread">Alle gelesen</button>` : ""}
+        </span>
       </div>
-      <ul class="news-list">${shown.map(itemHtml).join("")}</ul>
+      ${shown.length ? `<ul class="news-list">${shown.map(itemHtml).join("")}</ul>`
+        : `<div class="empty"><div class="empty-icon">✅</div><p><strong>Alles gelesen.</strong></p><p class="muted small">Neue Meldungen erscheinen hier automatisch.</p></div>`}
       <p class="muted small news-foot">${d.errors && d.errors.length ? `Nicht erreichbar: ${escapeHtml(d.errors.join(", "))} · ` : ""}Stand ${new Date(d.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr · Antippen öffnet den Artikel</p>`;
   }
 
@@ -304,6 +312,11 @@
       load(true);
     }
     if (b.id === "btn-news-allread") markAllRead(shown);
+    if (b.id === "btn-news-hideread") {
+      nw.hideRead = !nw.hideRead;
+      storageSet("pp_news_hideread", nw.hideRead ? "1" : "0");
+      render();
+    }
     if (b.id === "btn-news-feeds") openFeeds();
   });
 

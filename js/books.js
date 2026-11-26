@@ -17,7 +17,9 @@
     active: false, books: [], covers: new Map(), query: "", sort: storageGet("pp_bk_sort") || "new",
     syncing: false, progress: null, open: null, folder: "",
     reads: new Map(),                                  // book_id → gelesen am (nur eigene)
-    readFilter: storageGet("pp_bk_read") || ""          // "" | "unread" | "read"
+    readFilter: storageGet("pp_bk_read") || "",         // "" | "unread" | "read"
+    genre: storageGet("pp_bk_genre") || "",
+    genreBusy: null
   };
   const hid = () => state.household.id;
   const isOwner = () => state.role === "owner";
@@ -31,7 +33,7 @@
   async function loadBooks() {
     const rows = [];
     for (let off = 0; off < 20000; off += 1000) {
-      const { data, error } = await sb.from("books").select("id, file_name, size, modified, format, title, author, series, series_index, description, cover_path, sent_at, created_at")
+      const { data, error } = await sb.from("books").select("*")
         .eq("household_id", hid()).range(off, off + 999);
       if (error) throw error;
       rows.push(...data);
@@ -115,7 +117,17 @@
     const q = bk.query.trim().toLowerCase();
     $("#bk-readf").innerHTML = [["", "Alle"], ["unread", "Ungelesen"], ["read", "✓ Gelesen"]]
       .map(([k, l]) => `<button class="chip${bk.readFilter === k ? " active" : ""}" data-bk-read="${k}">${l}</button>`).join("");
+    // Genres (Schritt 48)
+    const hasGenreCol = bk.books.length && "genre" in bk.books[0];
+    const counts = new Map();
+    for (const b of bk.books) if (b.genre) counts.set(b.genre, (counts.get(b.genre) || 0) + 1);
+    if (bk.genre && !counts.has(bk.genre)) bk.genre = "";
+    const missing = hasGenreCol ? bk.books.filter(b => !b.genre && (b.title || b.file_name)).length : 0;
+    $("#bk-genres").innerHTML = (counts.size ? [`<button class="chip${bk.genre ? "" : " active"}" data-bk-genre="">Alle Genres</button>`,
+        ...[...counts].sort((a, b) => b[1] - a[1]).map(([g, n]) => `<button class="chip${bk.genre === g ? " active" : ""}" data-bk-genre="${escapeHtml(g)}">${escapeHtml(g)} <span class="chip-count">${n}</span></button>`)].join("") : "") +
+      (missing ? `<button class="chip bk-genre-ai" id="btn-bk-genres"${bk.genreBusy ? " disabled" : ""}>${bk.genreBusy ? `✨ ${bk.genreBusy}` : `✨ ${missing} ohne Genre – bestimmen`}</button>` : "");
     const list = sorted(bk.books
+      .filter(b => !bk.genre || b.genre === bk.genre)
       .filter(b => !bk.readFilter || (bk.readFilter === "read") === bk.reads.has(b.id))
       .filter(b => !q || [b.title, b.author, b.series, b.file_name].some(x => String(x || "").toLowerCase().includes(q))));
     $("#bk-status").textContent = bk.progress
@@ -156,9 +168,57 @@
       ${b.description ? `<p class="bk-desc">${escapeHtml(b.description)}</p>` : ""}
       ${ok ? "" : `<p class="small nutri-stale">${escapeHtml(fmt.toUpperCase())} nimmt Amazon per Mail nicht an – in Calibre als EPUB speichern.</p>`}
       ${b.size > 35 * 1048576 ? `<p class="small nutri-stale">Über 35 MB – zu groß für den Versand per Mail.</p>` : ""}`;
+    if ("genre" in b) {
+      $("#bk-detail").insertAdjacentHTML("beforeend", `<label class="bk-genre-pick">Genre <select id="bk-genre-select"><option value="">– ohne –</option>${GENRES.map(g => `<option${b.genre === g ? " selected" : ""}>${escapeHtml(g)}</option>`).join("")}</select></label>`);
+    }
     $("#btn-bk-kindle").disabled = !ok || b.size > 35 * 1048576;
     paintReadBtn();
     openSheet("sheet-book");
+  }
+
+  // ---------- Genres ----------
+  const GENRES = ["Krimi & Thriller", "Roman", "Fantasy", "Science-Fiction", "Liebesroman", "Historischer Roman", "Horror",
+    "Humor", "Kinder & Jugend", "Biografie", "Sachbuch", "Ratgeber", "Kochbuch", "Reise", "Klassiker", "Comic & Manga", "Sonstiges"];
+
+  $("#bk-detail").addEventListener("change", async e => {
+    if (e.target.id !== "bk-genre-select" || !bk.open) return;
+    const genre = e.target.value;
+    const { error } = await sb.from("books").update({ genre }).eq("id", bk.open.id);
+    if (error) { toast(sqlHint(error), true); return; }
+    bk.open.genre = genre;
+    render();
+    toast(genre ? `Genre: ${genre}` : "Genre entfernt.");
+  });
+
+  async function detectGenres() {
+    const todo = bk.books.filter(b => !b.genre && (b.title || b.file_name));
+    if (!todo.length || bk.genreBusy) return;
+    let done = 0, failed = "";
+    for (let i = 0; i < todo.length; i += 40) {
+      bk.genreBusy = `Genres werden bestimmt … ${done} von ${todo.length}`;
+      render();
+      const batch = todo.slice(i, i + 40);
+      try {
+        const { data, error } = await sb.functions.invoke("assist", { body: { action: "genres", books: batch.map(b => ({ id: b.id, title: b.title || b.file_name.replace(/\.[^.]+$/, ""), author: b.author, series: b.series, description: (b.description || "").slice(0, 300) })) } });
+        if (error) {
+          let msg = error.message;
+          try { const j = await error.context.json(); msg = j.error || msg; } catch { /* egal */ }
+          throw new Error(msg);
+        }
+        // je Genre eine Abfrage
+        const byGenre = new Map();
+        for (const x of data.books || []) byGenre.set(x.genre, [...(byGenre.get(x.genre) || []), x.id]);
+        for (const [genre, ids] of byGenre) {
+          const { error: e2 } = await sb.from("books").update({ genre }).in("id", ids);
+          if (e2) throw new Error(sqlHint(e2));
+          for (const id of ids) { const b = bk.books.find(x => x.id === id); if (b) b.genre = genre; }
+          done += ids.length;
+        }
+      } catch (err) { failed = err.message; break; }
+    }
+    bk.genreBusy = null;
+    render();
+    toast(failed ? `${done} Genres bestimmt, dann Fehler: ${failed}` : `Genres für ${done} Bücher bestimmt.`, !!failed);
   }
 
   // ---------- Klicks ----------
@@ -167,6 +227,8 @@
     if (!b) return;
     if (b.dataset.bk) { openBook(b.dataset.bk); return; }
     if (b.dataset.bkRead !== undefined) { bk.readFilter = b.dataset.bkRead; storageSet("pp_bk_read", bk.readFilter); render(); return; }
+    if (b.dataset.bkGenre !== undefined) { bk.genre = b.dataset.bkGenre; storageSet("pp_bk_genre", bk.genre); render(); return; }
+    if (b.id === "btn-bk-genres") { detectGenres(); return; }
     if (b.dataset.bkSort) { bk.sort = b.dataset.bkSort; storageSet("pp_bk_sort", bk.sort); render(); return; }
     if (b.id === "btn-bk-refresh") sync(true);
   });
