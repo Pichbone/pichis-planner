@@ -226,7 +226,8 @@
     "training": { id: "fitness", title: "Training", module: "fitness" },
     "gesundheit": { id: "health", title: "Gesundheit", module: "health" },
     "suche": { id: "search", title: "Suche", module: "search" },
-    "auto": { id: "car", title: "Auto", module: "car" }
+    "auto": { id: "car", title: "Auto", module: "car" },
+    "wuensche": { id: "gifts", title: "Wunschliste", module: "gifts" }
   };
   let activeView = null;
 

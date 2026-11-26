@@ -1929,3 +1929,24 @@ body.has-bg[data-view="home"] h2 { text-shadow: 0 1px 6px color-mix(in srgb, var
 .fuel-stations { display: grid; gap: 6px; margin: 8px 0; }
 .fuel-st { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
 .fuel-st .muted { grid-column: 1; } .fuel-st-p { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ===== Wunschliste ===== */
+:root { --gift: #DB2777; --gift-soft: #FCE7F3; }
+@media (prefers-color-scheme: dark) { :root { --gift: #F9A8D4; --gift-soft: #2E1A26; } }
+.tile-gifts { border-color: var(--gift); background: var(--gift-soft); } .tile-gifts .tile-status { color: var(--gift); }
+.gift-intro { margin: 6px 0 12px; }
+.gift-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.gift-card { padding: 12px; }
+.gift-card.received { opacity: .65; }
+.gift-card.taken { border-color: #16A34A; }
+.gift-head { display: flex; align-items: baseline; gap: 8px; }
+.gift-prio { font-size: .85rem; white-space: nowrap; }
+.gift-title { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.gift-title a { color: inherit; }
+.gift-price { font-weight: 700; color: var(--gift); white-space: nowrap; }
+.gift-note { margin: 4px 0; }
+.gift-card p { margin: 4px 0; }
+.gift-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.gift-taken { color: #16A34A; font-weight: 600; font-size: .9rem; }
+.gift-mine { color: var(--gift); font-weight: 700; font-size: .9rem; }
+.gift-secret { background: var(--gift-soft); padding: 8px 10px; border-radius: 10px; }

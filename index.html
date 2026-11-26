@@ -239,6 +239,11 @@
           <div class="tile-name">Auto</div>
           <div class="tile-status" id="tile-car-status">Tankbuch</div>
         </a>
+        <a class="tile tile-active tile-gifts" href="#/wuensche">
+          <div class="tile-icon">🎁</div>
+          <div class="tile-name">Wünsche</div>
+          <div class="tile-status" id="tile-gift-status">Wunschliste</div>
+        </a>
         <a class="tile tile-active tile-archive" href="#/archiv">
           <div class="tile-icon">🗄️</div>
           <div class="tile-name">Archiv</div>
@@ -535,6 +540,12 @@
      <div id="view-car" class="view" hidden>
       <div class="chips" id="car-chips"></div>
       <div id="car-body"></div>
+     </div>
+
+     <!-- ===== Wunschliste ===== -->
+     <div id="view-gifts" class="view" hidden>
+      <div class="chips" id="gift-people"></div>
+      <div id="gift-body"></div>
      </div>
 
      <!-- ===== Dokumentenarchiv ===== -->
@@ -1278,6 +1289,29 @@
       <button type="submit" class="btn btn-primary btn-block">Speichern</button>
     </form>
     <div class="note-actions"><span></span><button type="button" class="link danger-link" id="btn-car-delete" hidden>Auto löschen</button></div>
+  </div>
+
+  <div id="sheet-gift" class="sheet" hidden role="dialog" aria-label="Wunsch">
+    <div class="sheet-handle"></div>
+    <div class="panel-head">
+      <h2 id="gift-sheet-title">Neuer Wunsch</h2>
+      <button class="icon-btn" data-close-sheet aria-label="Schließen">✕</button>
+    </div>
+    <p class="small gift-secret" id="gift-secret-hint" hidden></p>
+    <form id="form-gift" class="form" autocomplete="off">
+      <label>Was? <input type="text" name="title" maxlength="160" placeholder="z. B. Bluetooth-Kopfhörer" required></label>
+      <label>Link <span class="hint">(optional)</span><input type="url" name="url" maxlength="1000" placeholder="https://…" inputmode="url"></label>
+      <div class="form-row form-row-even">
+        <label>Preis ca. (€) <input type="text" name="price" inputmode="decimal" placeholder="optional"></label>
+        <label>Wie wichtig? <select name="priority"><option value="1">☆ Kleinigkeit</option><option value="2">⭐ Wunsch</option><option value="3">⭐⭐⭐ Großer Wunsch</option></select></label>
+      </div>
+      <label>Hinweis <span class="hint">(Größe, Farbe, Variante …)</span><input type="text" name="note" maxlength="500" placeholder="z. B. Größe L, in Schwarz"></label>
+      <button type="submit" class="btn btn-primary btn-block">Speichern</button>
+    </form>
+    <div class="note-actions">
+      <button type="button" class="link" id="btn-gift-reopen" hidden>Doch noch nicht bekommen</button>
+      <button type="button" class="link danger-link" id="btn-gift-delete" hidden>Löschen</button>
+    </div>
   </div>
 
   <div id="sheet-book" class="sheet sheet-tall" hidden role="dialog" aria-label="Buch">
@@ -2230,6 +2264,7 @@
   <script src="/js/search.js"></script>
   <script src="/js/fridge.js"></script>
   <script src="/js/car.js"></script>
+  <script src="/js/gifts.js"></script>
   <script src="/js/today.js"></script>
 </body>
 </html>
